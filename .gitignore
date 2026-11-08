@@ -1,0 +1,23 @@
+.env
+.env.*
+*.key
+secrets*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.ignore/
+.scratch/
+docs/
