@@ -5,9 +5,9 @@ CSIT6000V Course Project Repository
 
 ```text
 backend/                   FastAPI app, ingestion, ranking; submits TACC client jobs
-backend/tacc-qwen-client/  the program the backend submits to TACC (standard library only)
+backend/tacc_qwen_client/  the program the backend submits to TACC (standard library only)
 frontend/                  React + TypeScript
-tacc-qwen-serve/           job that starts the Qwen service; started by hand before use
+tacc_qwen_serve/           job that starts the Qwen service; started by hand before use
 eval/                      evaluation script and metrics
 ```
 
