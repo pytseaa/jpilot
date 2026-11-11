@@ -22,3 +22,5 @@ Thumbs.db
 .scratch/
 docs/
 eval/
+
+backend/tacc_qwen_client/prompts.json
