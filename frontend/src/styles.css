@@ -1,0 +1,360 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: #1f2933;
+  background: #fff;
+}
+
+/* An author display rule would otherwise beat the browser's rule for [hidden]. */
+[hidden] {
+  display: none !important;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  flex: none;
+  box-sizing: border-box;
+  width: 16rem;
+  padding: 0.875rem;
+  overflow-y: auto;
+  background: #f3f4f6;
+}
+
+.new-session {
+  display: block;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+  background: #2b2f3a;
+  border-radius: 6px;
+}
+
+.sessions {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sessions button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  overflow: hidden;
+  color: #1f2933;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border-radius: 6px;
+}
+
+.sessions button[aria-current="true"] {
+  font-weight: 600;
+  background: #e2e6ec;
+}
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.6rem 1.1rem;
+}
+
+.menu-toggle {
+  padding: 0.25rem 0.5rem;
+  font-size: 1.25rem;
+  color: #52606d;
+  background: none;
+}
+
+.brand {
+  padding: 0.35rem 0.9rem;
+  font-size: 1.1rem;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+}
+
+main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* The review screen is a column; the landing screen centres the composer in the panel. */
+.screen {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.screen.landing {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: none;
+  padding-bottom: 6rem;
+}
+
+.landing-form {
+  width: 100%;
+  max-width: 40rem;
+  text-align: center;
+}
+
+.landing-form h1 {
+  margin: 0 0 1.25rem;
+  font-size: 2rem;
+  font-weight: 400;
+}
+
+.composer {
+  box-sizing: border-box;
+  max-width: 38rem;
+  margin: 0 auto;
+  padding: 1rem 1.1rem 0.75rem;
+  text-align: left;
+  background: #f1f2f4;
+  border-radius: 18px;
+}
+
+.composer .role-input {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  font-size: 1rem;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.composer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.composer-row + .composer-row {
+  margin-top: 0.5rem;
+}
+
+.attach {
+  padding: 0.25rem;
+  line-height: 0;
+  color: #1c5fd1;
+  background: none;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 14rem;
+  padding: 0.15rem 0.15rem 0.15rem 0.6rem;
+  overflow: hidden;
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #fff;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+}
+
+.file-chip button {
+  padding: 0 0.4rem;
+  color: #1f2933;
+  background: none;
+}
+
+.pills {
+  display: contents;
+}
+
+.pill {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+  color: #1c5fd1;
+  background: #fff;
+  border: 1px solid #1c5fd1;
+  border-radius: 999px;
+}
+
+.pill[aria-pressed="true"] {
+  color: #fff;
+  background: #1c5fd1;
+}
+
+.pill-select {
+  width: auto;
+  max-width: 11rem;
+  margin: 0;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+  background: #fff;
+  border-radius: 999px;
+}
+
+.send {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  margin-left: auto;
+  font-size: 1.25rem;
+  border-radius: 50%;
+}
+
+.role-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.role-card {
+  width: 12rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.85rem;
+  color: #52606d;
+  background: #fff;
+  border: 1px solid #dde2e8;
+  border-radius: 10px;
+}
+
+.role-card:hover {
+  border-color: #1c5fd1;
+}
+
+.role-card strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 1rem;
+  color: #1f4e9c;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.4rem;
+}
+
+label,
+.field {
+  display: block;
+  margin: 1rem 0;
+  font-weight: 600;
+}
+
+input:not([type="checkbox"]),
+select,
+textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  font: inherit;
+  font-weight: normal;
+  border: 1px solid #9aa5b1;
+  border-radius: 4px;
+}
+
+button {
+  padding: 0.5rem 1.25rem;
+  font: inherit;
+  color: #fff;
+  background: #1c5fd1;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #7b8794;
+  cursor: wait;
+}
+
+button.secondary {
+  color: #1c5fd1;
+  background: #fff;
+  border: 1px solid #1c5fd1;
+}
+
+:focus-visible {
+  outline: 3px solid #f0b429;
+  outline-offset: 2px;
+}
+
+.note {
+  color: #52606d;
+}
+
+.error {
+  color: #b00020;
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.chips li {
+  padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+  font-weight: normal;
+  background: #e4ebf5;
+  border-radius: 999px;
+}
+
+.chips button {
+  padding: 0 0.5rem;
+  color: #1f2933;
+  background: none;
+}
+
+.add-keyword {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.review-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.review-card {
+  padding: 0.25rem 1.1rem 0.75rem;
+  background: #f1f2f4;
+  border-radius: 18px;
+}
+
+.search {
+  margin-left: auto;
+  padding: 0.5rem 1.5rem;
+  border-radius: 999px;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
