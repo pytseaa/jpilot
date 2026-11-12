@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 
@@ -9,3 +10,6 @@ class SearchRequest:
     summary: str
     keywords: list[str]
     target_role: str
+    employment_types: Sequence[str]
+    experience_band: str | None
+    industry: str | None

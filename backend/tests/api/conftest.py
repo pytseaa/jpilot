@@ -24,6 +24,7 @@ def client(runner, tmp_path):
 def upload(client):
     """Send a CV to the app the way the browser does."""
     def send(content, **form):
+        form = {"employment_types": ["full-time"], **form}
         return client.post("/api/search-requests", data=form,
                            files={"cv": ("cv.pdf", content, "application/pdf")})
     return send

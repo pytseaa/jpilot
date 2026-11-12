@@ -38,8 +38,9 @@ def test_a_failed_summary_call_gives_an_error_and_no_request(tmp_path):
         return {"cv-summary": {"status": "failed", "error_type": "timeout"}}
 
     with TestClient(create_app(runner=failing_runner, data_dir=tmp_path)) as client:
-        response = client.post("/api/search-requests", files={"cv": (
-            "cv.pdf", text_pdf("Analyst at a retail bank"), "application/pdf")})
+        response = client.post(
+            "/api/search-requests", data={"employment_types": "full-time"},
+            files={"cv": ("cv.pdf", text_pdf("Analyst at a retail bank"), "application/pdf")})
 
     assert response.status_code == 502
     assert "CV summary" in response.json()["detail"]
