@@ -10,6 +10,7 @@ def runner():
     return FakeRunner({"cv-summary": {
         "summary": "Analyst with five years in retail banking.",
         "keywords": ["SQL", "Python", "reporting"],
+        "target_role": "Data analyst",
     }})
 
 
@@ -22,7 +23,7 @@ def client(runner, tmp_path):
 @pytest.fixture
 def upload(client):
     """Send a CV to the app the way the browser does."""
-    def send(content):
-        return client.post("/api/search-requests",
+    def send(content, **form):
+        return client.post("/api/search-requests", data=form,
                            files={"cv": ("cv.pdf", content, "application/pdf")})
     return send

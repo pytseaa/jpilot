@@ -5,6 +5,7 @@ DEMO_ANSWERS = {
         "summary": "Data analyst with five years in retail banking. Strong in SQL, Python "
                    "and dashboards, and has led a small reporting team.",
         "keywords": ["data analyst", "SQL", "Python", "reporting"],
+        "target_role": "Data analyst",
     },
 }
 

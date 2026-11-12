@@ -8,3 +8,4 @@ class SearchRequest:
     cv_text: str
     summary: str
     keywords: list[str]
+    target_role: str

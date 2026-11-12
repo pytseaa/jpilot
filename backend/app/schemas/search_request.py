@@ -2,9 +2,10 @@ from pydantic import BaseModel
 
 
 class CvSummaryAnswer(BaseModel):
-    """What the CV summary prompt must get back from Qwen."""
+    """What the CV summary prompt must get back from Qwen. target_role only when it was asked for."""
     summary: str
     keywords: list[str]
+    target_role: str = ""
 
 
 class Review(BaseModel):
@@ -12,3 +13,4 @@ class Review(BaseModel):
     id: str
     summary: str
     keywords: list[str]
+    target_role: str

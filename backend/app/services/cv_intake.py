@@ -8,7 +8,6 @@ from app import prompts
 from app.schemas.search_request import CvSummaryAnswer
 
 SUMMARY_ID = "cv-summary"
-REQUIRED_KEYS = ["summary", "keywords"]
 NO_TEXT_MESSAGE = ("We could not read any text from this file. "
                    "Please upload a text-based PDF, not a scan or an image.")
 
@@ -32,10 +31,14 @@ def extract_text(data):
     return text
 
 
-def summarise(cv_text, runner):
-    """One runner submission holding the CV summary prompt."""
-    prompt = {"id": SUMMARY_ID, "prompt": prompts.CV_SUMMARY.format(cv_text=cv_text),
-              "required_keys": REQUIRED_KEYS}
+def summarise(cv_text, runner, propose_target_role):
+    """One runner submission holding the CV summary prompt.
+
+    Qwen is asked for a target role only when propose_target_role is true."""
+    required_keys = ["summary", "keywords"] + (["target_role"] if propose_target_role else [])
+    target_role_key = prompts.TARGET_ROLE_KEY if propose_target_role else ""
+    prompt = {"id": SUMMARY_ID, "required_keys": required_keys,
+              "prompt": prompts.CV_SUMMARY.format(cv_text=cv_text, target_role_key=target_role_key)}
     record = runner([prompt])[SUMMARY_ID]
     try:
         if record["status"] != "ok":
