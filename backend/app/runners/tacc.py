@@ -3,7 +3,6 @@
 Same contract as FakeRunner: takes the prompt list, returns the answer file's records by id."""
 import json
 import re
-import shutil
 import subprocess
 import tempfile
 import time
@@ -21,17 +20,19 @@ class TaccRunner:
         self.poll_seconds = poll_seconds
 
     def __call__(self, prompts):
-        with tempfile.TemporaryDirectory() as tmp:
-            folder = Path(tmp) / "client"
-            shutil.copytree(self.client_dir, folder, ignore=shutil.ignore_patterns("__pycache__"))
-            (folder / "prompts.json").write_text(json.dumps({"prompts": prompts}), encoding="utf-8")
-            job = JOB_NUMBER.search(self._run("submit", cwd=folder)[1]).group(1)
+        prompt_file = self.client_dir / "prompts.json"  # holds CV text, so it goes as soon as the call ends
+        try:
+            prompt_file.write_text(json.dumps({"prompts": prompts}), encoding="utf-8")
+            job = JOB_NUMBER.search(self._run("submit", cwd=self.client_dir)[1]).group(1)
             # tcloud reports an error for a job that has finished, so an error means "done".
             while self._run("ps", "-j", job)[0] == 0:
                 time.sleep(self.poll_seconds)
-            answers = Path(tmp) / "answers.json"
-            self._run("download", f"jpilot-tacc-client/job-{job}.json", str(answers))
-            return json.loads(answers.read_text(encoding="utf-8"))["answers"]
+            with tempfile.TemporaryDirectory() as tmp:
+                answers = Path(tmp) / "answers.json"
+                self._run("download", f"jpilot-tacc-client/job-{job}.json", str(answers))
+                return json.loads(answers.read_text(encoding="utf-8"))["answers"]
+        finally:
+            prompt_file.unlink(missing_ok=True)
 
     def _run(self, *args, cwd=None):
         """Run tcloud. Return its exit code and its output with the NUL bytes it writes removed."""

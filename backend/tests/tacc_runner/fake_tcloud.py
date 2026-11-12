@@ -8,6 +8,7 @@ Everything it keeps is in the folder named by FAKE_TCLOUD_HOME:
     calls.jsonl      one line per command run
     submissions/<n>/ a copy of the folder each `submit` was run in
     userdir/         the user's folder on TACC
+    submitted-from   the folder the last submit was run from
 """
 import json
 import os
@@ -42,6 +43,10 @@ class FakeTcloud:
         """The files of one submission, by name."""
         return {p.name: p.read_bytes() for p in (self.home / "submissions" / str(job)).iterdir()}
 
+    def submitted_from(self):
+        """The folder the last submit was run from."""
+        return Path((self.home / "submitted-from").read_text(encoding="utf-8"))
+
 
 def say(text, stream):
     # The real tool puts NUL bytes in its output. One between every character is the worst case.
@@ -65,6 +70,7 @@ def submit(home):
     submissions = home / "submissions"
     job = FIRST_JOB + (len(list(submissions.iterdir())) if submissions.exists() else 0)
     shutil.copytree(Path.cwd(), submissions / str(job))
+    (home / "submitted-from").write_text(str(Path.cwd().resolve()), encoding="utf-8")
     say("tcloud 0.4.1 2026-11-10 uploaded 5632 bytes in 9 seconds", sys.stdout)
     say(f"Submitted batch job {job}", sys.stdout)
     return 0

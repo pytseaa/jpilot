@@ -1,4 +1,8 @@
 """The real runner, driven through a fake tcloud that writes NUL bytes and errors on a finished job."""
+import json
+
+from fake_tcloud import FIRST_JOB
+
 PROMPTS = [{"id": "cv-summary", "prompt": "Read this CV.", "required_keys": ["summary"]}]
 OK = {"status": "ok", "answer": {"summary": "Analyst."}}
 
@@ -17,3 +21,28 @@ def test_the_runner_waits_until_the_status_command_errors_because_the_job_finish
 
     assert runner(PROMPTS) == {"cv-summary": OK}
     assert [call[:2] for call in tcloud.calls()].count(["ps", "-j"]) == 4  # 3 running, then the error
+
+
+def test_the_prompt_file_is_uploaded_with_the_folder(tcloud, runner):
+    tcloud.will_answer({"cv-summary": OK})
+
+    runner(PROMPTS)
+
+    assert json.loads(tcloud.submitted(FIRST_JOB)["prompts.json"]) == {"prompts": PROMPTS}
+
+
+def test_the_job_is_submitted_from_the_client_folder_itself(tcloud, runner, client_dir):
+    tcloud.will_answer({"cv-summary": OK})
+
+    runner(PROMPTS)
+
+    assert tcloud.submitted_from() == client_dir.resolve()
+
+
+def test_the_prompt_file_is_removed_once_the_call_is_over(tcloud, runner, client_dir):
+    # The prompt file holds CV text, so it must not stay in the folder after the call.
+    tcloud.will_answer({"cv-summary": OK})
+
+    runner(PROMPTS)
+
+    assert not (client_dir / "prompts.json").exists()
