@@ -50,7 +50,11 @@ export function App() {
         {/* Every session stays mounted and only the active one is shown, so edits survive switching. */}
         <main>
           {sessions.map((s) => (
-            <div key={s.key} hidden={s.key !== activeKey}>
+            <div
+              key={s.key}
+              className={s.review ? "screen" : "screen landing"}
+              hidden={s.key !== activeKey}
+            >
               {s.review ? (
                 <ReviewScreen review={s.review} onRestart={startSession} />
               ) : (

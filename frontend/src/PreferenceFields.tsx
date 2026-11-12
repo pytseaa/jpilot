@@ -1,9 +1,9 @@
 import type { Preferences } from "./api";
 
 // These lists must match the ones in backend/app/schemas/search_request.py.
-const EMPLOYMENT_TYPES = ["full-time", "part-time", "contractor"];
-const EXPERIENCE_BANDS = ["0-2", "3-5", "6-9", "10+"];
-const INDUSTRIES = [
+export const EMPLOYMENT_TYPES = ["full-time", "part-time", "contractor"];
+export const EXPERIENCE_BANDS = ["0-2", "3-5", "6-9", "10+"];
+export const INDUSTRIES = [
   "Banking and finance",
   "Insurance",
   "Professional services (accounting, legal, consulting)",
@@ -24,17 +24,18 @@ const INDUSTRIES = [
 
 export const NO_EMPLOYMENT_TYPE = "Pick at least one employment type.";
 
+export const toggleEmploymentType = (value: Preferences, type: string): Preferences => ({
+  ...value,
+  employment_types: value.employment_types.includes(type)
+    ? value.employment_types.filter((t) => t !== type)
+    : [...value.employment_types, type],
+});
+
 type Props = { value: Preferences; onChange: (next: Preferences) => void };
 
 /** The form's preferences. Region is fixed to Hong Kong, so it is shown and not asked. */
 export function PreferenceFields({ value, onChange }: Props) {
-  const toggle = (type: string) =>
-    onChange({
-      ...value,
-      employment_types: value.employment_types.includes(type)
-        ? value.employment_types.filter((t) => t !== type)
-        : [...value.employment_types, type],
-    });
+  const toggle = (type: string) => onChange(toggleEmploymentType(value, type));
 
   return (
     <>

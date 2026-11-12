@@ -85,16 +85,165 @@ body {
   border-radius: 6px;
 }
 
-/* Each session's screen is a 40rem column for now; the composer and review card replace it. */
 main {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   overflow-y: auto;
 }
 
-main > div {
+/* The review screen is a column; the landing screen centres the composer in the panel. */
+.screen {
+  box-sizing: border-box;
+  width: 100%;
   max-width: 40rem;
   margin: 0 auto;
   padding: 1.5rem;
+}
+
+.screen.landing {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: none;
+  padding-bottom: 6rem;
+}
+
+.landing-form {
+  width: 100%;
+  max-width: 40rem;
+  text-align: center;
+}
+
+.landing-form h1 {
+  margin: 0 0 1.25rem;
+  font-size: 2rem;
+  font-weight: 400;
+}
+
+.composer {
+  box-sizing: border-box;
+  max-width: 38rem;
+  margin: 0 auto;
+  padding: 1rem 1.1rem 0.75rem;
+  text-align: left;
+  background: #f1f2f4;
+  border-radius: 18px;
+}
+
+.composer .role-input {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  font-size: 1rem;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.composer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.composer-row + .composer-row {
+  margin-top: 0.5rem;
+}
+
+.attach {
+  padding: 0.25rem;
+  line-height: 0;
+  color: #1c5fd1;
+  background: none;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 14rem;
+  padding: 0.15rem 0.15rem 0.15rem 0.6rem;
+  overflow: hidden;
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #fff;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+}
+
+.file-chip button {
+  padding: 0 0.4rem;
+  color: #1f2933;
+  background: none;
+}
+
+.pills {
+  display: contents;
+}
+
+.pill {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+  color: #1c5fd1;
+  background: #fff;
+  border: 1px solid #1c5fd1;
+  border-radius: 999px;
+}
+
+.pill[aria-pressed="true"] {
+  color: #fff;
+  background: #1c5fd1;
+}
+
+.composer select {
+  width: auto;
+  max-width: 11rem;
+  margin: 0;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+  background: #fff;
+  border-radius: 999px;
+}
+
+.send {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  margin-left: auto;
+  font-size: 1.25rem;
+  border-radius: 50%;
+}
+
+.role-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.role-card {
+  width: 12rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.85rem;
+  color: #52606d;
+  background: #fff;
+  border: 1px solid #dde2e8;
+  border-radius: 10px;
+}
+
+.role-card:hover {
+  border-color: #1c5fd1;
+}
+
+.role-card strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 1rem;
+  color: #1f4e9c;
 }
 
 h1 {
