@@ -1,12 +1,6 @@
 import { type SubmitEvent, useRef, useState } from "react";
 import { createRequest, type Preferences, type Review } from "./api";
-import {
-  EMPLOYMENT_TYPES,
-  EXPERIENCE_BANDS,
-  INDUSTRIES,
-  NO_EMPLOYMENT_TYPE,
-  toggleEmploymentType,
-} from "./PreferenceFields";
+import { BandAndIndustry, EmploymentPills, NO_EMPLOYMENT_TYPE } from "./PreferenceFields";
 
 // Static text. A click only fills the target role; nothing is sent to the backend.
 const EXAMPLE_ROLES = [
@@ -15,7 +9,7 @@ const EXAMPLE_ROLES = [
   { role: "Software developer", about: "Backend, frontend and full-stack work" },
 ];
 
-export function UploadForm({ onRead }: { onRead: (review: Review) => void }) {
+export function UploadForm({ onRead }: { onRead: (review: Review, fileName: string) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [targetRole, setTargetRole] = useState("");
   const [prefs, setPrefs] = useState<Preferences>({
@@ -52,7 +46,7 @@ export function UploadForm({ onRead }: { onRead: (review: Review) => void }) {
     setError("");
     setBusy(true);
     try {
-      onRead(await createRequest(file, targetRole, prefs));
+      onRead(await createRequest(file, targetRole, prefs), file.name);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -97,45 +91,10 @@ export function UploadForm({ onRead }: { onRead: (review: Review) => void }) {
               </button>
             </span>
           )}
-          <span className="pills" role="group" aria-label="Employment type (pick one or more)">
-            {EMPLOYMENT_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                className="pill"
-                aria-pressed={prefs.employment_types.includes(type)}
-                onClick={() => setPrefs(toggleEmploymentType(prefs, type))}
-              >
-                {type}
-              </button>
-            ))}
-          </span>
+          <EmploymentPills value={prefs} onChange={setPrefs} />
         </div>
         <div className="composer-row">
-          <select
-            aria-label="Experience band (optional)"
-            value={prefs.experience_band ?? ""}
-            onChange={(e) => setPrefs({ ...prefs, experience_band: e.target.value || null })}
-          >
-            <option value="">Experience band</option>
-            {EXPERIENCE_BANDS.map((band) => (
-              <option key={band} value={band}>
-                {band} years
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Industry (optional)"
-            value={prefs.industry ?? ""}
-            onChange={(e) => setPrefs({ ...prefs, industry: e.target.value || null })}
-          >
-            <option value="">Industry</option>
-            {INDUSTRIES.map((industry) => (
-              <option key={industry} value={industry}>
-                {industry}
-              </option>
-            ))}
-          </select>
+          <BandAndIndustry value={prefs} onChange={setPrefs} />
           <button type="submit" className="send" aria-label="Read my CV" disabled={busy}>
             &uarr;
           </button>

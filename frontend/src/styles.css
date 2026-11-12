@@ -198,7 +198,7 @@ main {
   background: #1c5fd1;
 }
 
-.composer select {
+.pill-select {
   width: auto;
   max-width: 11rem;
   margin: 0;
@@ -252,22 +252,10 @@ h1 {
 }
 
 label,
-fieldset,
 .field {
   display: block;
   margin: 1rem 0;
   font-weight: 600;
-}
-
-fieldset {
-  border: 1px solid #cbd2d9;
-  border-radius: 4px;
-}
-
-label.inline {
-  display: inline-block;
-  margin: 0 1rem 0 0;
-  font-weight: normal;
 }
 
 input:not([type="checkbox"]),
@@ -344,6 +332,25 @@ button.secondary {
 .add-keyword {
   display: flex;
   gap: 0.5rem;
+}
+
+.review-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.review-card {
+  padding: 0.25rem 1.1rem 0.75rem;
+  background: #f1f2f4;
+  border-radius: 18px;
+}
+
+.search {
+  margin-left: auto;
+  padding: 0.5rem 1.5rem;
+  border-radius: 999px;
 }
 
 .actions {

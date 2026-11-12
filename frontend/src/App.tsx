@@ -4,7 +4,7 @@ import { ReviewScreen } from "./ReviewScreen";
 import { Sidebar, type Session } from "./Sidebar";
 import { UploadForm } from "./UploadForm";
 
-const emptySession = (): Session => ({ key: crypto.randomUUID(), review: null });
+const emptySession = (): Session => ({ key: crypto.randomUUID(), review: null, fileName: null });
 
 export function App() {
   const [sessions, setSessions] = useState<Session[]>(() => [emptySession()]);
@@ -21,8 +21,8 @@ export function App() {
   };
 
   // Functional update: this runs after an upload finishes, when `sessions` may have changed.
-  const cvRead = (key: string, review: Review) =>
-    setSessions((list) => list.map((s) => (s.key === key ? { ...s, review } : s)));
+  const cvRead = (key: string, review: Review, fileName: string) =>
+    setSessions((list) => list.map((s) => (s.key === key ? { ...s, review, fileName } : s)));
 
   return (
     <div className="app">
@@ -56,9 +56,9 @@ export function App() {
               hidden={s.key !== activeKey}
             >
               {s.review ? (
-                <ReviewScreen review={s.review} onRestart={startSession} />
+                <ReviewScreen review={s.review} fileName={s.fileName} onRestart={startSession} />
               ) : (
-                <UploadForm onRead={(review) => cvRead(s.key, review)} />
+                <UploadForm onRead={(review, fileName) => cvRead(s.key, review, fileName)} />
               )}
             </div>
           ))}

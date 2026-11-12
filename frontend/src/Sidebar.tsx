@@ -1,7 +1,7 @@
 import type { Review } from "./api";
 
 /** One tab-local session. It stays empty until a CV is read, then it holds the review. */
-export type Session = { key: string; review: Review | null };
+export type Session = { key: string; review: Review | null; fileName: string | null };
 
 type Props = {
   open: boolean;
