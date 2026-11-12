@@ -46,5 +46,15 @@ def summarise(cv_text, runner, propose_target_role):
         answer = CvSummaryAnswer.model_validate(record["answer"])
     except ValidationError as exc:
         raise SummaryFailed("invalid answer") from exc
-    answer.keywords = stop_words.remove(answer.keywords)
+    if propose_target_role and not answer.target_role.strip():
+        raise SummaryFailed("no target role")
+    answer.keywords = _unique(stop_words.remove(answer.keywords))
     return answer
+
+
+def _unique(keywords):
+    """Merge keywords that differ only in letter case; the first spelling and position win."""
+    first = {}
+    for keyword in keywords:
+        first.setdefault(keyword.lower(), keyword)
+    return list(first.values())

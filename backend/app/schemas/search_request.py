@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import BaseModel, BeforeValidator, Field, StringConstraints
 
 EmploymentType = Literal["full-time", "part-time", "contractor"]
 ExperienceBand = Literal["0-2", "3-5", "6-9", "10+"]
@@ -19,7 +19,7 @@ BlankIsNone = BeforeValidator(lambda value: value or None)
 
 class CvSummaryAnswer(BaseModel):
     """What the CV summary prompt must get back from Qwen. target_role only when it was asked for."""
-    summary: str
+    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     keywords: list[str]
     target_role: str = ""
 
