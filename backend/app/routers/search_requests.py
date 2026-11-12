@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 
 from app.models.search_request import SearchRequest
+from app.runners.tacc import SubmissionFailed
 from app.schemas.search_request import (
     BlankIsNone, EmploymentType, ExperienceBand, Industry, Review, Reviewed)
 from app.services import cv_intake
@@ -34,6 +35,8 @@ def create(
         answer = cv_intake.summarise(cv_text, request.app.state.runner, not target_role)
     except cv_intake.SummaryFailed as exc:
         raise HTTPException(502, "The CV summary could not be made. Please try again.") from exc
+    except SubmissionFailed as exc:
+        raise HTTPException(502, str(exc)) from exc
     stored = SearchRequest(uuid4().hex, cv_text, answer.summary, answer.keywords,
                            target_role or answer.target_role.strip(),
                            employment_types, experience_band, industry)

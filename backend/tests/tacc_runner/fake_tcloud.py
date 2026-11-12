@@ -35,6 +35,13 @@ class FakeTcloud:
     def keep_running_for(self, polls):
         (self.home / "running_polls").write_text(str(polls), encoding="utf-8")
 
+    def will_print_on_submit(self, text, exit_code=0):
+        """Make `submit` print this text and exit with this code, instead of submitting."""
+        (self.home / "submit-output").write_text(json.dumps([text, exit_code]), encoding="utf-8")
+
+    def will_not_write_answer_file(self):
+        (self.home / "no-answer-file").write_text("", encoding="utf-8")
+
     def calls(self):
         text = (self.home / "calls.jsonl").read_text(encoding="utf-8")
         return [json.loads(line) for line in text.splitlines()]
@@ -60,6 +67,8 @@ def running_polls(home):
 
 
 def finish(home, job):
+    if (home / "no-answer-file").exists():
+        return
     answers = json.loads((home / "answers.json").read_text(encoding="utf-8"))
     path = home / "userdir" / "jpilot-tacc-client" / f"job-{job}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -67,6 +76,10 @@ def finish(home, job):
 
 
 def submit(home):
+    if (home / "submit-output").exists():
+        text, exit_code = json.loads((home / "submit-output").read_text(encoding="utf-8"))
+        say(text, sys.stdout)
+        return exit_code
     submissions = home / "submissions"
     job = FIRST_JOB + (len(list(submissions.iterdir())) if submissions.exists() else 0)
     shutil.copytree(Path.cwd(), submissions / str(job))
