@@ -4,7 +4,7 @@ DEMO_ANSWERS = {
     "cv-summary": {
         "summary": "Data analyst with five years in retail banking. Strong in SQL, Python "
                    "and dashboards, and has led a small reporting team.",
-        "keywords": ["data analyst", "SQL", "Python", "reporting"],
+        "keywords": ["data analyst", "SQL", "Python", "reporting", "experience", "team"],
         "target_role": "Data analyst",
     },
 }

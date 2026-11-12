@@ -4,7 +4,7 @@ import io
 from pydantic import ValidationError
 from pypdf import PdfReader
 
-from app import prompts
+from app import prompts, stop_words
 from app.schemas.search_request import CvSummaryAnswer
 
 SUMMARY_ID = "cv-summary"
@@ -43,6 +43,8 @@ def summarise(cv_text, runner, propose_target_role):
     try:
         if record["status"] != "ok":
             raise SummaryFailed(record["error_type"])
-        return CvSummaryAnswer.model_validate(record["answer"])
+        answer = CvSummaryAnswer.model_validate(record["answer"])
     except ValidationError as exc:
         raise SummaryFailed("invalid answer") from exc
+    answer.keywords = stop_words.remove(answer.keywords)
+    return answer
