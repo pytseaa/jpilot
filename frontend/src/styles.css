@@ -2,15 +2,99 @@ body {
   margin: 0;
   font-family: system-ui, sans-serif;
   color: #1f2933;
-  background: #f4f6f8;
+  background: #fff;
 }
 
+/* An author display rule would otherwise beat the browser's rule for [hidden]. */
+[hidden] {
+  display: none !important;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  flex: none;
+  box-sizing: border-box;
+  width: 16rem;
+  padding: 0.875rem;
+  overflow-y: auto;
+  background: #f3f4f6;
+}
+
+.new-session {
+  display: block;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+  background: #2b2f3a;
+  border-radius: 6px;
+}
+
+.sessions {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sessions button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  overflow: hidden;
+  color: #1f2933;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border-radius: 6px;
+}
+
+.sessions button[aria-current="true"] {
+  font-weight: 600;
+  background: #e2e6ec;
+}
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.6rem 1.1rem;
+}
+
+.menu-toggle {
+  padding: 0.25rem 0.5rem;
+  font-size: 1.25rem;
+  color: #52606d;
+  background: none;
+}
+
+.brand {
+  padding: 0.35rem 0.9rem;
+  font-size: 1.1rem;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+}
+
+/* Each session's screen is a 40rem column for now; the composer and review card replace it. */
 main {
+  flex: 1;
+  overflow-y: auto;
+}
+
+main > div {
   max-width: 40rem;
-  margin: 2rem auto;
+  margin: 0 auto;
   padding: 1.5rem;
-  background: #fff;
-  border-radius: 8px;
 }
 
 h1 {
