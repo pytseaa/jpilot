@@ -36,7 +36,7 @@ cd frontend && npm ci && npm run dev    # open http://localhost:5173
 3. Start the backend. `JPILOT_RUNNER` is unset, so it uses TACC:
 
 ```bash
-.venv/bin/python -m uvicorn --app-dir backend app.main:create_app --factory --port 8000
+.venv/Scripts/python.exe -m uvicorn --app-dir backend app.main:create_app --factory --port 8000
 ```
 
 `JPILOT_RUNNER` accepts only `tacc` (the default) or `fake`. Any other value stops the app at startup.
