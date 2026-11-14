@@ -43,4 +43,17 @@ cd frontend && npm ci && npm run dev    # open http://localhost:5173
 
 Tests: `.venv/Scripts/python.exe -m pytest backend`. Frontend typecheck: `cd frontend && npm run typecheck`.
 
+### Fill the job database
+
+Ingestion searches 15 roles in Hong Kong on JSearch (at most 30 requests of the 200 a month), has Qwen read each new job once, and stores the jobs in `backend/data/jpilot.db`. It needs the Qwen service from the steps above. Run it from the `backend` folder:
+
+```bash
+cd backend
+JSEARCH_API_KEY=<your key> ../.venv/Scripts/python.exe -m app.ingest
+```
+
+It prints how many jobs it fetched, stored, found already stored, dropped as mostly Chinese or for having no description, and failed. Running it again is safe: a job already stored only gets a new collection date.
+
+Add `--snapshot` to freeze a copy of the database for the evaluation after the run. It is written to `backend/data/snapshots/jpilot-<date>.db`, and a second snapshot on the same day is refused before any request is made. Without the flag nothing is frozen.
+
 The JSearch key is read from the `JSEARCH_API_KEY` environment variable and is never written to a file.

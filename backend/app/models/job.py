@@ -1,5 +1,7 @@
-"""The job table: one row per JSearch ad, keyed by its job_id."""
+"""The job table: one row per job from JSearch, keyed by its job_id."""
 
+# shortcut: IF NOT EXISTS never changes a table that already exists, so a new column needs the
+# database file deleted and refilled; add a migration once a database holds jobs worth keeping.
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS jobs (
     job_id TEXT PRIMARY KEY,

@@ -9,6 +9,6 @@ from app.schemas.search_request import EmploymentType, Industry
 class JobExtractionAnswer(BaseModel):
     region: Literal["Hong Kong", "other", "unknown"]
     employment_types: list[EmploymentType]  # empty means unknown
-    minimum_years: Annotated[int, Field(ge=0)] | None  # None means the ad says nothing
+    minimum_years: Annotated[int, Field(ge=0)] | None  # None means the job says nothing
     industry: Industry | Literal["unknown"]
     requirements: list[str]

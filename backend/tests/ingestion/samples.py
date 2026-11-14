@@ -9,10 +9,10 @@ EXTRACTED = {"region": "Hong Kong", "employment_types": ["full-time"], "minimum_
              "industry": "Banking and finance", "requirements": ["SQL", "Python"]}
 
 
-def jsearch_returning(*ads):
-    """A fake JSearch where the first role finds these ads on one page and every other role finds none."""
+def jsearch_returning(*jobs):
+    """A fake JSearch where the first role finds these jobs on one page and every other role finds none."""
     pages = {f"{role} in Hong Kong": [[]] for role in ROLES}
-    pages[f"{ROLES[0]} in Hong Kong"] = [list(ads)]
+    pages[f"{ROLES[0]} in Hong Kong"] = [list(jobs)]
     return FakeJSearch(pages)
 
 
