@@ -19,5 +19,11 @@ class FakeRunner:
 
     def __call__(self, prompts):
         self.submissions.append(prompts)
-        return {item["id"]: {"status": "ok", "answer": self.answers[item["id"]]}
-                for item in prompts}
+        return {item["id"]: self._record(self.answers[item["id"]]) for item in prompts}
+
+    @staticmethod
+    def _record(answer):
+        # An answer of None stands for a call that failed, as the TACC client records it.
+        if answer is None:
+            return {"status": "failed", "error_type": "invalid_json"}
+        return {"status": "ok", "answer": answer}
