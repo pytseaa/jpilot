@@ -1,29 +1,11 @@
 """Ingestion stores each new ad once its extraction works. The database is the seam."""
-import sqlite3
-
 import pytest
 from fake_jsearch import job
+from samples import EXTRACTED, TODAY, rows
 
-from app import db
 from app.runners.fake import FakeRunner
 from app.runners.tacc import SubmissionFailed
 from app.services.ingestion import store_new_ads
-
-TODAY = "2026-11-14"
-EXTRACTED = {"region": "Hong Kong", "employment_types": ["full-time"], "minimum_years": 3,
-             "industry": "Banking and finance", "requirements": ["SQL", "Python"]}
-
-
-@pytest.fixture
-def conn(tmp_path):
-    connection = db.connect(tmp_path)
-    connection.row_factory = sqlite3.Row
-    yield connection
-    connection.close()
-
-
-def rows(conn):
-    return [dict(row) for row in conn.execute("SELECT * FROM jobs ORDER BY job_id")]
 
 
 def test_a_new_ad_is_stored_with_its_fields_and_both_dates_set_to_today(conn):
