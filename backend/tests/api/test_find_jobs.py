@@ -53,46 +53,45 @@ def wait_until_finished(client, base):
     return client.get(f"{base}/status").json()
 
 
-def search(client, upload, **edits):
-    """Press Search on a fresh upload with the review edited as given. Return the result jobs."""
-    base, _ = start(client, upload, **edits)
-    assert wait_until_finished(client, base) == {"stage": "done"}
-    return client.get(f"{base}/results").json()["jobs"]
+def qualifying(client, keywords=("SQL", "Python", "reporting"), employment_types=("full-time",)):
+    """What retrieval finds, before any cut to the shortlist, so the filters and matching are checked whole."""
+    with closing(db.connect(client.app.state.data_dir)) as conn:
+        return retrieval.find_qualifying(conn, keywords, employment_types)
 
 
 def ids(jobs):
     return {job["job_id"] for job in jobs}
 
 
-def test_a_finished_search_lists_a_confirmed_hong_kong_job(client, upload):
-    jobs = search(client, upload, employment_types=["full-time"])
+def test_a_confirmed_hong_kong_job_qualifies(client):
+    jobs = qualifying(client, employment_types=["full-time"])
 
     assert "h01" in ids(jobs)
 
 
-def test_a_job_passes_the_employment_type_filter_if_it_has_any_picked_type(client, upload):
-    jobs = search(client, upload, employment_types=["contractor", "part-time"])
+def test_a_job_passes_the_employment_type_filter_if_it_has_any_picked_type(client):
+    jobs = qualifying(client, employment_types=["contractor", "part-time"])
 
     assert ids(jobs) >= {"h06", "h07", "h08"}  # part-time, contractor, and full-time plus contractor
     assert not ids(jobs) & {"h01", "h02", "h03", "h16", "h17"}  # full-time only
 
 
-def test_jobs_outside_hong_kong_are_removed(client, upload):
-    jobs = search(client, upload, employment_types=["full-time"])
+def test_jobs_outside_hong_kong_are_removed(client):
+    jobs = qualifying(client, employment_types=["full-time"])
 
     assert "h09" not in ids(jobs)  # full-time and matching, so only the region filter removes it
 
 
-def test_a_job_with_an_unknown_region_or_type_is_kept_and_marked_unverified(client, upload):
-    jobs = search(client, upload, employment_types=["full-time"])
+def test_a_job_with_an_unknown_region_or_type_is_kept_and_marked_unverified(client):
+    jobs = qualifying(client, employment_types=["full-time"])
     unverified = {job["job_id"] for job in jobs if job["unverified"]}
 
     assert unverified == {"h11", "h12", "h13"}  # unknown region, unknown type, both unknown
     assert "h01" in ids(jobs) - unverified  # a confirmed job carries no flag
 
 
-def test_jobs_not_seen_in_the_last_30_days_are_never_returned(client, upload):
-    jobs = search(client, upload, employment_types=["full-time"])
+def test_jobs_not_seen_in_the_last_30_days_are_never_returned(client):
+    jobs = qualifying(client, employment_types=["full-time"])
 
     assert {"h02", "h03"} <= ids(jobs)  # seen 29 and 30 days ago: still open
     assert not ids(jobs) & {"h04", "h05", "h15"}  # seen 31, 90 and 40 days ago: closed
@@ -100,48 +99,50 @@ def test_jobs_not_seen_in_the_last_30_days_are_never_returned(client, upload):
 
 def test_experience_band_and_industry_never_remove_a_job(client, upload):
     # h16 asks for 12 years and is in banking; the candidate picks 0-2 years and insurance.
-    jobs = search(client, upload, employment_types=["full-time"], experience_band="0-2",
-                  industry="Insurance")
+    # The search must finish with the preferences set; retrieval itself never sees them.
+    base, _ = start(client, upload, employment_types=["full-time"], experience_band="0-2",
+                    industry="Insurance")
+    assert wait_until_finished(client, base) == {"stage": "done"}
 
-    assert {"h16", "h17"} <= ids(jobs)
+    assert {"h16", "h17"} <= ids(qualifying(client, employment_types=["full-time"]))
 
 
-def test_matching_ignores_letter_case(client, upload):
-    jobs = search(client, upload, keywords=["sql", "PYTHON"], employment_types=["full-time"])
+def test_matching_ignores_letter_case(client):
+    jobs = qualifying(client, keywords=["sql", "PYTHON"], employment_types=["full-time"])
 
     assert ids(jobs) == {"k-title", "k-desc", "k-lower"}
 
 
-def test_a_keyword_matches_a_word_next_to_punctuation(client, upload):
-    jobs = search(client, upload, keywords=["python"], employment_types=["full-time"])
+def test_a_keyword_matches_a_word_next_to_punctuation(client):
+    jobs = qualifying(client, keywords=["python"], employment_types=["full-time"])
 
     assert ids(jobs) == {"k-lower"}  # its text is "(python)"
 
 
-def test_a_keyword_matches_a_word_in_curly_quotes(client, upload, tmp_path):
+def test_a_keyword_matches_a_word_in_curly_quotes(client, tmp_path):
     store(tmp_path, [make_job("q1", title="Lead", description="“Tableau” ‘Excel’ wanted")])
 
-    jobs = search(client, upload, keywords=["excel", "tableau"], employment_types=["full-time"])
+    jobs = qualifying(client, keywords=["excel", "tableau"], employment_types=["full-time"])
 
     assert ids(jobs) == {"q1"}
 
 
-def test_a_keyword_is_split_on_spaces_and_one_word_is_enough(client, upload):
-    jobs = search(client, upload, keywords=["data analyst"], employment_types=["full-time"])
+def test_a_keyword_is_split_on_spaces_and_one_word_is_enough(client):
+    jobs = qualifying(client, keywords=["data analyst"], employment_types=["full-time"])
 
     assert {"h01", "k-title"} <= ids(jobs)  # h01 has only "analyst"; k-title has only "data"
     assert "k-stop" not in ids(jobs)  # neither word appears in it
 
 
-def test_stop_words_and_it_never_qualify_a_job(client, upload):
-    jobs = search(client, upload, keywords=["team", "IT", "SQL"], employment_types=["full-time"])
+def test_stop_words_and_it_never_qualify_a_job(client):
+    jobs = qualifying(client, keywords=["team", "IT", "SQL"], employment_types=["full-time"])
 
     assert "k-title" in ids(jobs)
     assert "k-stop" not in ids(jobs)  # its title says "Team" and its text says "it": neither counts
 
 
-def test_a_match_in_the_title_scores_like_one_in_the_description_and_ties_go_by_job_id(client, upload):
-    jobs = search(client, upload, keywords=["SQL"], employment_types=["full-time"])
+def test_a_match_in_the_title_scores_like_one_in_the_description_and_ties_go_by_job_id(client):
+    jobs = qualifying(client, keywords=["SQL"], employment_types=["full-time"])
 
     # k-title has "SQL" in its title and k-desc in its description. Both texts are five words with
     # one "sql", so the scores are equal and the job id decides the order.
@@ -228,18 +229,16 @@ def test_results_are_refused_until_the_search_is_done(client, upload, held):
     assert client.get(f"{base}/results").status_code == 409  # still searching
 
 
-def test_keywords_that_are_all_stop_words_match_no_job(client, upload):
-    jobs = search(client, upload, keywords=["the", "and"], employment_types=["full-time"])
-
-    assert jobs == []
+def test_keywords_that_are_all_stop_words_match_no_job(client):
+    assert qualifying(client, keywords=["the", "and"], employment_types=["full-time"]) == []
 
 
-def test_a_search_of_an_empty_database_finishes_with_no_jobs(client, upload, tmp_path):
+def test_an_empty_database_has_no_qualifying_jobs(client, tmp_path):
     with closing(db.connect(tmp_path)) as conn:
         conn.execute("DELETE FROM jobs")
         conn.commit()
 
-    assert search(client, upload, employment_types=["full-time"]) == []
+    assert qualifying(client, employment_types=["full-time"]) == []
 
 
 def store(tmp_path, jobs):
@@ -249,17 +248,17 @@ def store(tmp_path, jobs):
         conn.commit()
 
 
-def test_a_database_whose_jobs_have_no_words_left_finishes_with_no_jobs(client, upload, tmp_path):
+def test_a_database_whose_jobs_have_no_words_left_finishes_with_no_jobs(client, tmp_path):
     with closing(db.connect(tmp_path)) as conn:
         conn.execute("DELETE FROM jobs")
         conn.commit()
     store(tmp_path, [make_job("e1", title="The", description="and of"),
                      make_job("e2", title="", description="")])  # only stop words, or nothing at all
 
-    assert search(client, upload, keywords=["SQL"], employment_types=["full-time"]) == []
+    assert qualifying(client, keywords=["SQL"], employment_types=["full-time"]) == []
 
 
-def test_at_most_20_jobs_come_back_best_first(client, upload, tmp_path):
+def test_at_most_20_jobs_come_back_best_first(client, tmp_path):
     # Twenty-one jobs score alike. zz-sql says "SQL" twice in the same five words, so it scores higher.
     extra = [make_job(f"cap-{n:02}", types=["contractor"], title="Data developer",
                       description="SQL scripts weekly") for n in range(1, 22)]
@@ -267,6 +266,6 @@ def test_at_most_20_jobs_come_back_best_first(client, upload, tmp_path):
                           description="SQL SQL weekly"))
     store(tmp_path, extra)
 
-    jobs = search(client, upload, keywords=["SQL"], employment_types=["contractor"])
+    jobs = qualifying(client, keywords=["SQL"], employment_types=["contractor"])
 
     assert [job["job_id"] for job in jobs] == ["zz-sql"] + [f"cap-{n:02}" for n in range(1, 20)]
