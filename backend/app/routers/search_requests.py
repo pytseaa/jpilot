@@ -12,7 +12,7 @@ from app.runners.tacc import SubmissionFailed
 from app.schemas.search import Results, Status
 from app.schemas.search_request import (
     BlankIsNone, EmploymentType, ExperienceBand, Industry, Review, Reviewed)
-from app.services import cv_intake, retrieval
+from app.services import checking, cv_intake, retrieval
 
 router = APIRouter(prefix="/api/search-requests")
 logger = logging.getLogger(__name__)
@@ -58,11 +58,13 @@ def _stored(request, request_id):
     return stored
 
 
-def _run_search(data_dir, stored):
+def _run_search(data_dir, runner, stored):
     # shortcut: only a raised error ends a search, so one that hangs blocks every session until restart, add a timeout once a search can wait on Qwen.
     try:
         with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
-            stored.jobs = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
+            qualifying = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
+        stored.jobs, stored.dropped_claims = checking.check_jobs(
+            qualifying, stored.cv_text, stored.summary, runner)
         stored.stage = "done"
     except Exception:  # whatever went wrong, the candidate must see "failed", not a search that never ends
         logger.exception("The search for request %s failed", stored.id)
@@ -79,7 +81,8 @@ def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
             raise HTTPException(409, "A search is already running.")
         stored.stage = "searching"
     vars(stored).update(reviewed.model_dump())
-    Thread(target=_run_search, args=(request.app.state.data_dir, stored), daemon=True).start()
+    Thread(target=_run_search, args=(request.app.state.data_dir, request.app.state.runner, stored),
+           daemon=True).start()
     return _review(stored)
 
 
@@ -93,4 +96,4 @@ def results(request: Request, request_id: str) -> Results:
     stored = _stored(request, request_id)
     if stored.stage != "done":  # a search that is running or failed has no list to show
         raise HTTPException(409, "The search is not finished.")
-    return Results.model_validate({"jobs": stored.jobs})
+    return Results.model_validate({"jobs": stored.jobs, "dropped_claims": stored.dropped_claims})

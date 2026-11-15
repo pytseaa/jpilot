@@ -14,4 +14,5 @@ class SearchRequest:
     experience_band: str | None
     industry: str | None
     stage: str | None = None  # searching, done or failed; None until Search is pressed
-    jobs: list[dict] = field(default_factory=list)  # the qualifying jobs, once the search is done
+    jobs: list[dict] = field(default_factory=list)  # the checked jobs with their verified claims, once done
+    dropped_claims: int = 0

@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from app.schemas.check import Claim
+
 
 class Status(BaseModel):
     """Where a search is: searching, done or failed. None until the candidate presses Search."""
@@ -16,7 +18,10 @@ class ResultJob(BaseModel):
     posted_date: str | None
     collected: str
     unverified: bool
+    grade: int
+    claims: list[Claim]
 
 
 class Results(BaseModel):
     jobs: list[ResultJob]
+    dropped_claims: int  # claims whose quote was not found, counted apart from the shown ones

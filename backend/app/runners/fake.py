@@ -19,7 +19,13 @@ class FakeRunner:
 
     def __call__(self, prompts):
         self.submissions.append(prompts)
-        return {item["id"]: self._record(self.answers[item["id"]]) for item in prompts}
+        return {item["id"]: self._record(self._answer(item["id"])) for item in prompts}
+
+    def _answer(self, prompt_id):
+        # shortcut: until the fake grades on its own, every check without a canned answer is "no fit", remove this once it does.
+        if prompt_id.startswith("check-") and prompt_id not in self.answers:
+            return {"grade": 0, "claims": []}
+        return self.answers[prompt_id]
 
     @staticmethod
     def _record(answer):
