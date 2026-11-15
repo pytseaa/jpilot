@@ -20,17 +20,18 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
 
   const update = (patch: Partial<Reviewed>) => setValues({ ...values, ...patch });
 
-  // Ask the backend for the stage every 2 seconds while a search runs. A hidden session keeps polling.
+  // shortcut: polling never stops by itself (a hidden session, or a backend that lost the request, keeps asking), add a stop if the backend is ever not local.
   useEffect(() => {
     if (!searching) return;
     const timer = setInterval(async () => {
       try {
         const { stage: next } = await getStage(id);
         if (next === "done") setJobs((await getJobs(id)).jobs);
+        setError("");
         if (next !== "searching") setStage(next);
       } catch (err) {
+        // The backend may still be searching, so keep the stage and poll again instead of giving up.
         setError(err instanceof Error ? err.message : String(err));
-        setStage(null);
       }
     }, POLL_MS);
     return () => clearInterval(timer);

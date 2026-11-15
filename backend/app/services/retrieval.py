@@ -11,7 +11,7 @@ OPEN_DAYS = 30  # a job counts as open for 30 days after the day ingestion last 
 RESULT_LIMIT = 20
 # "it" is off the CV stop list so the keyword "IT" survives the review, but matching ignores it.
 MATCH_STOP_WORDS = STOP_WORDS | {"it"}
-PUNCTUATION = ".,;:!?()[]\"'"
+PUNCTUATION = ".,;:!?()[]\"'“”‘’"
 
 
 def tokens(text):
@@ -23,13 +23,15 @@ def tokens(text):
 def find_qualifying(conn, keywords, employment_types):
     """The jobs that pass the hard filters and match a keyword, best first, at most RESULT_LIMIT."""
     conn.row_factory = sqlite3.Row
+    # shortcut: reads the whole table and rebuilds the BM25 index on every search, fine for about 300 jobs, cache the index when the database grows.
     jobs = [dict(row) for row in conn.execute("SELECT * FROM jobs ORDER BY job_id")]
-    if not jobs:  # BM25 cannot score an empty corpus
-        return []
     docs = [tokens(f"{job['title'] or ''} {job['description']}") for job in jobs]
+    if not any(docs):  # BM25 cannot score a corpus with no words, which covers an empty database too
+        return []
     terms = set(tokens(" ".join(keywords)))
     # The scores use the whole database, so a narrow search does not change how a job scores.
     scores = BM25Okapi(docs).get_scores(sorted(terms))
+    # shortcut: counts the 30 days from today, so a frozen snapshot turns Closed 30 days on, take the date from the snapshot for the evaluation.
     oldest_open = (date.today() - timedelta(days=OPEN_DAYS)).isoformat()
     # Region is fixed to Hong Kong: only "other" is removed, and "unknown" stays marked Unverified.
     picked = [(score, job) for job, doc, score in zip(jobs, docs, scores)

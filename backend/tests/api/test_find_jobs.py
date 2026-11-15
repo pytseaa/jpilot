@@ -118,6 +118,14 @@ def test_a_keyword_matches_a_word_next_to_punctuation(client, upload):
     assert ids(jobs) == {"k-lower"}  # its text is "(python)"
 
 
+def test_a_keyword_matches_a_word_in_curly_quotes(client, upload, tmp_path):
+    store(tmp_path, [make_job("q1", title="Lead", description="“Tableau” ‘Excel’ wanted")])
+
+    jobs = search(client, upload, keywords=["excel", "tableau"], employment_types=["full-time"])
+
+    assert ids(jobs) == {"q1"}
+
+
 def test_a_keyword_is_split_on_spaces_and_one_word_is_enough(client, upload):
     jobs = search(client, upload, keywords=["data analyst"], employment_types=["full-time"])
 
@@ -163,6 +171,35 @@ def test_a_search_for_another_request_is_refused_while_one_runs(client, upload, 
     assert client.post(other_url, json=other).status_code == 200  # free again once the first is done
 
 
+class SlowToRead:
+    """A stored request whose stage takes a moment to read, as when another thread gets the CPU."""
+    def __init__(self):
+        self.reading = threading.Event()
+
+    @property
+    def stage(self):
+        self.reading.set()
+        time.sleep(0.3)  # long enough for an upload to add a request
+        return None
+
+
+def test_an_upload_while_a_start_checks_the_other_sessions_is_not_lost_or_broken(client, upload):
+    first = upload(CV).json()
+    slow = client.app.state.requests["slow"] = SlowToRead()
+    answers = []
+    start_search = threading.Thread(target=lambda: answers.append(
+        client.post(f"/api/search-requests/{first['id']}/search", json=first)))
+    start_search.start()
+    assert slow.reading.wait(5)  # the start is part-way through checking the sessions
+
+    second = upload(CV)  # arrives in the middle of it
+    start_search.join(5)
+
+    assert [answer.status_code for answer in answers] == [200]
+    assert second.status_code == 200
+    assert second.json()["id"] in client.app.state.requests
+
+
 def test_a_search_that_fails_ends_as_failed_and_gives_no_list(client, upload, monkeypatch):
     def broken(*args):
         raise RuntimeError("the job database cannot be read")
@@ -205,15 +242,30 @@ def test_a_search_of_an_empty_database_finishes_with_no_jobs(client, upload, tmp
     assert search(client, upload, employment_types=["full-time"]) == []
 
 
+def store(tmp_path, jobs):
+    """Add jobs to the database the app reads."""
+    with closing(db.connect(tmp_path)) as conn:
+        conn.executemany(INSERT, jobs)
+        conn.commit()
+
+
+def test_a_database_whose_jobs_have_no_words_left_finishes_with_no_jobs(client, upload, tmp_path):
+    with closing(db.connect(tmp_path)) as conn:
+        conn.execute("DELETE FROM jobs")
+        conn.commit()
+    store(tmp_path, [make_job("e1", title="The", description="and of"),
+                     make_job("e2", title="", description="")])  # only stop words, or nothing at all
+
+    assert search(client, upload, keywords=["SQL"], employment_types=["full-time"]) == []
+
+
 def test_at_most_20_jobs_come_back_best_first(client, upload, tmp_path):
     # Twenty-one jobs score alike. zz-sql says "SQL" twice in the same five words, so it scores higher.
     extra = [make_job(f"cap-{n:02}", types=["contractor"], title="Data developer",
                       description="SQL scripts weekly") for n in range(1, 22)]
     extra.append(make_job("zz-sql", types=["contractor"], title="Data developer",
                           description="SQL SQL weekly"))
-    with closing(db.connect(tmp_path)) as conn:
-        conn.executemany(INSERT, extra)
-        conn.commit()
+    store(tmp_path, extra)
 
     jobs = search(client, upload, keywords=["SQL"], employment_types=["contractor"])
 

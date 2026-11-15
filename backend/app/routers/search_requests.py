@@ -59,6 +59,7 @@ def _stored(request, request_id):
 
 
 def _run_search(data_dir, stored):
+    # shortcut: only a raised error ends a search, so one that hangs blocks every session until restart, add a timeout once a search can wait on Qwen.
     try:
         with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
             stored.jobs = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
@@ -73,8 +74,8 @@ def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
     """Keep the reviewed values and start the search in the background."""
     stored = _stored(request, request_id)
     with _start_lock:  # two starts at the same moment must not both pass the check
-        # One search at a time for the whole backend, whichever session started it.
-        if any(other.stage == "searching" for other in request.app.state.requests.values()):
+        # One search at a time for the whole backend; list() copies, as an upload may add a request.
+        if any(other.stage == "searching" for other in list(request.app.state.requests.values())):
             raise HTTPException(409, "A search is already running.")
         stored.stage = "searching"
     vars(stored).update(reviewed.model_dump())
