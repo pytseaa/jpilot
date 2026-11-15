@@ -1,5 +1,6 @@
+import logging
 from contextlib import closing
-from threading import Thread
+from threading import Lock, Thread
 from typing import Annotated
 from uuid import uuid4
 
@@ -14,6 +15,8 @@ from app.schemas.search_request import (
 from app.services import cv_intake, retrieval
 
 router = APIRouter(prefix="/api/search-requests")
+logger = logging.getLogger(__name__)
+_start_lock = Lock()
 
 
 def _review(stored):
@@ -56,17 +59,25 @@ def _stored(request, request_id):
 
 
 def _run_search(data_dir, stored):
-    with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
-        stored.jobs = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
-    stored.stage = "done"
+    try:
+        with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
+            stored.jobs = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
+        stored.stage = "done"
+    except Exception:  # whatever went wrong, the candidate must see "failed", not a search that never ends
+        logger.exception("The search for request %s failed", stored.id)
+        stored.stage = "failed"
 
 
 @router.post("/{request_id}/search")
 def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
     """Keep the reviewed values and start the search in the background."""
     stored = _stored(request, request_id)
+    with _start_lock:  # two starts at the same moment must not both pass the check
+        # One search at a time for the whole backend, whichever session started it.
+        if any(other.stage == "searching" for other in request.app.state.requests.values()):
+            raise HTTPException(409, "A search is already running.")
+        stored.stage = "searching"
     vars(stored).update(reviewed.model_dump())
-    stored.stage = "searching"
     Thread(target=_run_search, args=(request.app.state.data_dir, stored), daemon=True).start()
     return _review(stored)
 
@@ -78,4 +89,7 @@ def status(request: Request, request_id: str) -> Status:
 
 @router.get("/{request_id}/results")
 def results(request: Request, request_id: str) -> Results:
-    return Results.model_validate({"jobs": _stored(request, request_id).jobs})
+    stored = _stored(request, request_id)
+    if stored.stage != "done":  # a search that is running or failed has no list to show
+        raise HTTPException(409, "The search is not finished.")
+    return Results.model_validate({"jobs": stored.jobs})

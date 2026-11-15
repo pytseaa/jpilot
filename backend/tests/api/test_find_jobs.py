@@ -1,3 +1,4 @@
+import threading
 import time
 from contextlib import closing
 
@@ -6,6 +7,7 @@ from fixture_jobs import fixture_jobs, make_job
 from pdfs import text_pdf
 
 from app import db
+from app.services import retrieval
 from app.services.ingestion import INSERT
 
 CV = text_pdf("Analyst at a retail bank")
@@ -19,15 +21,42 @@ def job_database(tmp_path, client):
         conn.commit()
 
 
-def search(client, upload, **edits):
-    """Press Search on a fresh upload with the review edited as given. Return the result jobs."""
+@pytest.fixture
+def held(monkeypatch):
+    """Hold every search open, around the real search step, until the test sets the event."""
+    release = threading.Event()
+    real = retrieval.find_qualifying
+
+    def wait_then_search(*args):
+        release.wait(5)
+        return real(*args)
+
+    monkeypatch.setattr(retrieval, "find_qualifying", wait_then_search)
+    yield release
+    release.set()
+
+
+def start(client, upload, **edits):
+    """Upload a CV and press Search with the review edited as given. Return the request's URL and the body sent."""
     review = upload(CV).json()
     base = f"/api/search-requests/{review['id']}"
-    client.post(f"{base}/search", json={**review, **edits})
+    body = {**review, **edits}
+    assert client.post(f"{base}/search", json=body).status_code == 200
+    return base, body
+
+
+def wait_until_finished(client, base):
+    """Poll the status until the search leaves "searching". Return the status."""
     deadline = time.monotonic() + 5
     while client.get(f"{base}/status").json()["stage"] == "searching" and time.monotonic() < deadline:
         time.sleep(0.01)
-    assert client.get(f"{base}/status").json() == {"stage": "done"}
+    return client.get(f"{base}/status").json()
+
+
+def search(client, upload, **edits):
+    """Press Search on a fresh upload with the review edited as given. Return the result jobs."""
+    base, _ = start(client, upload, **edits)
+    assert wait_until_finished(client, base) == {"stage": "done"}
     return client.get(f"{base}/results").json()["jobs"]
 
 
@@ -109,6 +138,57 @@ def test_a_match_in_the_title_scores_like_one_in_the_description_and_ties_go_by_
     # k-title has "SQL" in its title and k-desc in its description. Both texts are five words with
     # one "sql", so the scores are equal and the job id decides the order.
     assert [job["job_id"] for job in jobs] == ["k-desc", "k-title"]
+
+
+def test_a_second_start_while_a_search_runs_is_refused(client, upload, held):
+    base, body = start(client, upload, keywords=["SQL"], employment_types=["full-time"])
+    assert client.get(f"{base}/status").json() == {"stage": "searching"}
+
+    second = client.post(f"{base}/search", json=body)
+
+    assert second.status_code == 409
+    held.set()
+    assert wait_until_finished(client, base) == {"stage": "done"}  # the first search was not disturbed
+    assert ids(client.get(f"{base}/results").json()["jobs"]) == {"k-title", "k-desc"}
+
+
+def test_a_search_for_another_request_is_refused_while_one_runs(client, upload, held):
+    base, _ = start(client, upload, employment_types=["full-time"])
+    other = upload(CV).json()  # a second session in the sidebar, with its own CV
+    other_url = f"/api/search-requests/{other['id']}/search"
+
+    assert client.post(other_url, json=other).status_code == 409
+    held.set()
+    assert wait_until_finished(client, base) == {"stage": "done"}
+    assert client.post(other_url, json=other).status_code == 200  # free again once the first is done
+
+
+def test_a_search_that_fails_ends_as_failed_and_gives_no_list(client, upload, monkeypatch):
+    def broken(*args):
+        raise RuntimeError("the job database cannot be read")
+
+    monkeypatch.setattr(retrieval, "find_qualifying", broken)
+    base, _ = start(client, upload, employment_types=["full-time"])
+
+    assert wait_until_finished(client, base) == {"stage": "failed"}
+    assert client.get(f"{base}/results").status_code == 409
+
+
+def test_after_a_failed_search_the_candidate_can_search_again(client, upload, monkeypatch):
+    with monkeypatch.context() as broken:
+        broken.setattr(retrieval, "find_qualifying", lambda *args: 1 / 0)
+        base, body = start(client, upload, keywords=["SQL"], employment_types=["full-time"])
+        assert wait_until_finished(client, base) == {"stage": "failed"}
+
+    assert client.post(f"{base}/search", json=body).status_code == 200
+    assert wait_until_finished(client, base) == {"stage": "done"}
+    assert ids(client.get(f"{base}/results").json()["jobs"]) == {"k-title", "k-desc"}
+
+
+def test_results_are_refused_until_the_search_is_done(client, upload, held):
+    base, _ = start(client, upload, employment_types=["full-time"])
+
+    assert client.get(f"{base}/results").status_code == 409  # still searching
 
 
 def test_keywords_that_are_all_stop_words_match_no_job(client, upload):
