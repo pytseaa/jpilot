@@ -1,8 +1,11 @@
-import { useState } from "react";
-import { keepReviewed, type Review, type Reviewed } from "./api";
+import { useEffect, useState } from "react";
+import { getJobs, getStage, type ResultJob, type Review, type Reviewed, startSearch, type Stage } from "./api";
+import { JobList } from "./JobList";
 import { BandAndIndustry, EmploymentPills, NO_EMPLOYMENT_TYPE } from "./PreferenceFields";
 
 type Props = { review: Review; fileName: string | null; onRestart: () => void };
+
+const POLL_MS = 2000;
 
 // Not a <form>: pressing Enter in a field must never act as the Search button.
 export function ReviewScreen({ review, fileName, onRestart }: Props) {
@@ -11,12 +14,28 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
   const [newKeyword, setNewKeyword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [kept, setKept] = useState(false);
+  const [stage, setStage] = useState<Stage>(null);
+  const [jobs, setJobs] = useState<ResultJob[] | null>(null);
+  const searching = stage === "searching";
 
-  const update = (patch: Partial<Reviewed>) => {
-    setValues({ ...values, ...patch });
-    setKept(false);
-  };
+  const update = (patch: Partial<Reviewed>) => setValues({ ...values, ...patch });
+
+  // shortcut: polling never stops by itself (a hidden session, or a backend that lost the request, keeps asking), add a stop if the backend is ever not local.
+  useEffect(() => {
+    if (!searching) return;
+    const timer = setInterval(async () => {
+      try {
+        const { stage: next } = await getStage(id);
+        if (next === "done") setJobs((await getJobs(id)).jobs);
+        setError("");
+        if (next !== "searching") setStage(next);
+      } catch (err) {
+        // The backend may still be searching, so keep the stage and poll again instead of giving up.
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [searching, id]);
 
   const addKeyword = () => {
     const keyword = newKeyword.trim();
@@ -33,8 +52,9 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
     setError("");
     setBusy(true);
     try {
-      await keepReviewed(id, values);
-      setKept(true);
+      await startSearch(id, values);
+      setJobs(null); // only once the backend accepted the start, so a refusal keeps the old list
+      setStage("searching");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -98,17 +118,17 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
         </div>
         <div className="composer-row">
           <BandAndIndustry value={values} onChange={update} />
-          <button type="button" className="search" onClick={search} disabled={busy}>
+          <button type="button" className="search" onClick={search} disabled={busy || searching}>
             Search
           </button>
         </div>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
-      {kept && (
-        <p role="status" className="note">
-          Your reviewed values are kept. Searching comes in a later step.
-        </p>
+      {searching && <p role="status" className="note">Searching the job database...</p>}
+      {stage === "failed" && (
+        <p role="alert" className="error">The search failed. Please press Search to try again.</p>
       )}
+      {jobs && <JobList jobs={jobs} />}
       <div className="actions">
         <button type="button" className="secondary" onClick={onRestart}>
           Upload a different CV

@@ -17,6 +17,7 @@ def create_app(runner=None, data_dir=None):
 
     app = FastAPI(title="JobPilot", lifespan=lifespan)
     app.state.runner = runner or default_runner()
+    app.state.data_dir = data_dir
     app.state.requests = {}
     app.include_router(search_requests.router)
     return app
