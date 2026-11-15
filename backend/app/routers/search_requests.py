@@ -1,13 +1,17 @@
+from contextlib import closing
+from threading import Thread
 from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 
+from app import db
 from app.models.search_request import SearchRequest
 from app.runners.tacc import SubmissionFailed
+from app.schemas.search import Results, Status
 from app.schemas.search_request import (
     BlankIsNone, EmploymentType, ExperienceBand, Industry, Review, Reviewed)
-from app.services import cv_intake
+from app.services import cv_intake, retrieval
 
 router = APIRouter(prefix="/api/search-requests")
 
@@ -44,11 +48,34 @@ def create(
     return _review(stored)
 
 
-@router.post("/{request_id}/search")
-def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
-    """Keep the reviewed values. Nothing is searched yet, and Qwen is not called again."""
+def _stored(request, request_id):
     stored = request.app.state.requests.get(request_id)
     if stored is None:
         raise HTTPException(404, "This request was not found. Please upload your CV again.")
+    return stored
+
+
+def _run_search(data_dir, stored):
+    with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
+        stored.jobs = retrieval.find_qualifying(conn, stored.employment_types)
+    stored.stage = "done"
+
+
+@router.post("/{request_id}/search")
+def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
+    """Keep the reviewed values and start the search in the background."""
+    stored = _stored(request, request_id)
     vars(stored).update(reviewed.model_dump())
+    stored.stage = "searching"
+    Thread(target=_run_search, args=(request.app.state.data_dir, stored), daemon=True).start()
     return _review(stored)
+
+
+@router.get("/{request_id}/status")
+def status(request: Request, request_id: str) -> Status:
+    return Status(stage=_stored(request, request_id).stage)
+
+
+@router.get("/{request_id}/results")
+def results(request: Request, request_id: str) -> Results:
+    return Results.model_validate({"jobs": _stored(request, request_id).jobs})

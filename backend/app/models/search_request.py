@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -13,3 +13,5 @@ class SearchRequest:
     employment_types: Sequence[str]
     experience_band: str | None
     industry: str | None
+    stage: str | None = None  # searching, done or failed; None until Search is pressed
+    jobs: list[dict] = field(default_factory=list)  # the qualifying jobs, once the search is done
