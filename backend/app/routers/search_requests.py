@@ -57,7 +57,7 @@ def _stored(request, request_id):
 
 def _run_search(data_dir, stored):
     with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
-        stored.jobs = retrieval.find_qualifying(conn, stored.employment_types)
+        stored.jobs = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
     stored.stage = "done"
 
 
