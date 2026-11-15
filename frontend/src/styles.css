@@ -376,3 +376,33 @@ button.secondary {
   background: #fdf0d2;
   border-radius: 999px;
 }
+
+.grade {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  background: #e4ebf5;
+  border-radius: 999px;
+}
+
+.grade-2 {
+  color: #fff;
+  background: #1c5fd1;
+}
+
+.claim {
+  margin: 0.5rem 0 0.5rem 0.25rem;
+}
+
+.claim blockquote {
+  margin: 0.2rem 0 0.2rem 0.75rem;
+  padding-left: 0.6rem;
+  border-left: 3px solid #cbd2d9;
+}
+
+.source {
+  display: inline-block;
+  min-width: 4.5rem;
+  font-size: 0.8rem;
+  color: #52606d;
+}

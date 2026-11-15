@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getJobs, getStage, type ResultJob, type Review, type Reviewed, startSearch, type Stage } from "./api";
+import { getResults, getStage, type Results, type Review, type Reviewed, startSearch, type Stage } from "./api";
 import { JobList } from "./JobList";
 import { BandAndIndustry, EmploymentPills, NO_EMPLOYMENT_TYPE } from "./PreferenceFields";
 
@@ -15,7 +15,7 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<Stage>(null);
-  const [jobs, setJobs] = useState<ResultJob[] | null>(null);
+  const [results, setResults] = useState<Results | null>(null);
   const searching = stage === "searching";
 
   const update = (patch: Partial<Reviewed>) => setValues({ ...values, ...patch });
@@ -26,7 +26,7 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
     const timer = setInterval(async () => {
       try {
         const { stage: next } = await getStage(id);
-        if (next === "done") setJobs((await getJobs(id)).jobs);
+        if (next === "done") setResults(await getResults(id));
         setError("");
         if (next !== "searching") setStage(next);
       } catch (err) {
@@ -53,7 +53,7 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
     setBusy(true);
     try {
       await startSearch(id, values);
-      setJobs(null); // only once the backend accepted the start, so a refusal keeps the old list
+      setResults(null); // only once the backend accepted the start, so a refusal keeps the old list
       setStage("searching");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -124,11 +124,11 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
         </div>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
-      {searching && <p role="status" className="note">Searching the job database...</p>}
+      {searching && <p role="status" className="note">Searching and checking jobs...</p>}
       {stage === "failed" && (
         <p role="alert" className="error">The search failed. Please press Search to try again.</p>
       )}
-      {jobs && <JobList jobs={jobs} />}
+      {results && <JobList results={results} />}
       <div className="actions">
         <button type="button" className="secondary" onClick={onRestart}>
           Upload a different CV
