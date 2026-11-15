@@ -7,13 +7,15 @@ from app import prompts
 from app.schemas.check import CheckAnswer, Claim
 
 CHECK_KEYS = ["grade", "claims"]
+SHORTLIST_SIZE = 5
 
 
 def check_jobs(jobs, cv_text, summary, runner):
-    """One submission with one prompt per job. Return the jobs worth showing and the dropped-claim count.
+    """One submission with one prompt per job. Return the shortlist and the dropped-claim count.
 
     A job comes back with its grade and its verified claims. Grade 0 jobs, jobs whose call failed or whose
-    answer is not what the prompt asked for, and jobs with no verified claim left are left out."""
+    answer is not what the prompt asked for, and jobs with no verified claim left are left out. The shortlist
+    is at most SHORTLIST_SIZE jobs, grade 2 before grade 1, and keyword order within a grade."""
     if not jobs:
         return [], 0
     submission = [{"id": f"check-{i}", "required_keys": CHECK_KEYS,
@@ -30,7 +32,8 @@ def check_jobs(jobs, cv_text, summary, runner):
         dropped += unverified
         if verified:
             checked.append({**job, "grade": answer.grade, "claims": [c.model_dump() for c in verified]})
-    return checked, dropped
+    checked.sort(key=lambda job: -job["grade"])  # a stable sort keeps the keyword order within a grade
+    return checked[:SHORTLIST_SIZE], dropped
 
 
 def _answer(record):

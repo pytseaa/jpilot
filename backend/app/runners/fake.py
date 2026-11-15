@@ -19,13 +19,13 @@ class FakeRunner:
 
     def __call__(self, prompts):
         self.submissions.append(prompts)
-        return {item["id"]: self._record(self._answer(item["id"])) for item in prompts}
+        return {item["id"]: self._record(self._answer(item)) for item in prompts}
 
-    def _answer(self, prompt_id):
-        # shortcut: until the fake grades on its own, every check without a canned answer is "no fit", remove this once it does.
-        if prompt_id.startswith("check-") and prompt_id not in self.answers:
-            return {"grade": 0, "claims": []}
-        return self.answers[prompt_id]
+    def _answer(self, item):
+        # A check with no canned answer grades 2 and quotes the start of its own CV text and ad, so both verify.
+        if item["id"] not in self.answers and item["id"].startswith("check-"):
+            return _grade_by_quoting(item["prompt"])
+        return self.answers[item["id"]]
 
     @staticmethod
     def _record(answer):
@@ -33,3 +33,12 @@ class FakeRunner:
         if answer is None:
             return {"status": "failed", "error_type": "invalid_json"}
         return {"status": "ok", "answer": answer}
+
+
+def _grade_by_quoting(prompt):
+    """A grade 2 check whose quotes are the first three words of the CV text and of the ad in the prompt."""
+    # Read back from the prompt, so each quote is really in its source. Wording follows prompts.CHECK.
+    cv_text = prompt.split("\nCV:\n", 1)[1].split("\n\nJob ad:\n", 1)[0]
+    ad = prompt.split("\n\nJob ad:\n", 1)[1]
+    cv_quote, job_quote = " ".join(cv_text.split()[:3]), " ".join(ad.split()[:3])
+    return {"grade": 2, "claims": [{"requirement": job_quote, "cv_quote": cv_quote, "job_quote": job_quote}]}

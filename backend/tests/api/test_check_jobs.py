@@ -1,4 +1,5 @@
 from contextlib import closing
+from datetime import date
 
 import pytest
 from fixture_jobs import fixture_jobs, make_job
@@ -6,6 +7,7 @@ from pdfs import text_pdf
 from searches import wait_until_finished
 
 from app import db
+from app.services import retrieval
 from app.services.ingestion import INSERT
 
 CV_TEXT = "Built Tableau dashboards for a retail bank"
@@ -141,3 +143,64 @@ def test_each_check_prompt_carries_the_cv_summary_cv_text_and_one_ad_but_never_t
     assert all(CV_TEXT in p for p in prompts)  # the full CV text
     assert all(("finance" in p) != ("hospitals" in p) for p in prompts)  # one ad each, never both
     assert not any("Insurance" in p or "6-9" in p for p in prompts)  # preferences never reach Qwen
+
+
+def keyword_order(client, keyword):
+    """The job ids retrieval finds for one keyword, in keyword order, before any grading."""
+    with closing(db.connect(client.app.state.data_dir)) as conn:
+        return [job["job_id"] for job in retrieval.find_qualifying(conn, [keyword], ["full-time"])]
+
+
+def test_a_grade_2_job_is_shown_before_a_grade_1_job_even_when_keyword_order_puts_it_later(
+        client, upload, runner, store):
+    # "Tableau Tableau" scores higher than "Tableau", so g1 comes first in keyword order.
+    store(make_job("g1", description="Tableau Tableau reporting"),
+          make_job("g2", description="Tableau reporting"))
+    assert keyword_order(client, "tableau") == ["g1", "g2"]  # so check-0 is g1 and check-1 is g2
+    runner.answers["check-0"] = {"grade": 1, "claims": [CLAIM]}
+    runner.answers["check-1"] = {"grade": 2, "claims": [CLAIM]}
+
+    assert [job["job_id"] for job in run(client, upload)["jobs"]] == ["g2", "g1"]
+
+
+def test_jobs_of_the_same_grade_keep_the_keyword_order(client, upload, runner, store):
+    store(make_job("s1", description="Tableau reporting"),
+          make_job("s2", description="Tableau Tableau reporting"))
+    assert keyword_order(client, "tableau") == ["s2", "s1"]
+    runner.answers["check-0"] = {"grade": 2, "claims": [CLAIM]}
+    runner.answers["check-1"] = {"grade": 2, "claims": [CLAIM]}
+
+    assert [job["job_id"] for job in run(client, upload)["jobs"]] == ["s2", "s1"]
+
+
+def test_at_most_five_jobs_are_shown(client, upload, runner, store):
+    store(*[make_job(f"f{n}", description="Tableau reporting for finance") for n in range(1, 8)])
+    for n in range(7):
+        runner.answers[f"check-{n}"] = {"grade": 1, "claims": [CLAIM]}
+
+    results = run(client, upload)
+
+    # Equal scores go by job id, so the first five in keyword order are f1 to f5.
+    assert [job["job_id"] for job in results["jobs"]] == ["f1", "f2", "f3", "f4", "f5"]
+
+
+def test_without_a_canned_answer_the_fake_grades_a_job_by_quoting_its_text(client, upload, store):
+    store(make_job("t1", description="Tableau reporting for finance"))
+
+    results = run(client, upload)
+
+    [job] = results["jobs"]
+    assert (job["grade"], results["dropped_claims"]) == (2, 0)  # its quotes come from the prompt, so both verify
+
+
+def test_a_shown_job_carries_its_collection_date_and_its_posted_date(client, upload, runner, store):
+    store({**make_job("d1", description="Tableau reporting for finance"), "posted_date": "2026-11-01"},
+          make_job("d2", description="Tableau reporting for banks"))  # the source gave no posted date
+    runner.answers["check-0"] = {"grade": 2, "claims": [CLAIM]}
+    runner.answers["check-1"] = {"grade": 2, "claims": [CLAIM]}
+
+    jobs = {job["job_id"]: job for job in run(client, upload)["jobs"]}
+
+    assert jobs["d1"]["posted_date"] == "2026-11-01"
+    assert jobs["d2"]["posted_date"] is None
+    assert jobs["d1"]["collected"] == date.today().isoformat()
