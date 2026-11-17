@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 from app.schemas.check import Claim
@@ -18,7 +20,7 @@ class ResultJob(BaseModel):
     posted_date: str | None
     collected: str
     unverified: bool
-    grade: int
+    grade: Literal[1, 2]
     claims: list[Claim]
 
 

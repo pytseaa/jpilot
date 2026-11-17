@@ -204,3 +204,71 @@ def test_a_shown_job_carries_its_collection_date_and_its_posted_date(client, upl
     assert jobs["d1"]["posted_date"] == "2026-11-01"
     assert jobs["d2"]["posted_date"] is None
     assert jobs["d1"]["collected"] == date.today().isoformat()
+
+
+def test_a_quote_with_no_word_in_it_is_dropped(client, upload, runner, store):
+    store(make_job("t1", description="Tableau reporting - for finance"))
+    runner.answers["check-0"] = {"grade": 2, "claims": [{**CLAIM, "job_quote": "-"}]}
+
+    results = run(client, upload)
+
+    assert results["jobs"] == []  # the dash is in the ad, but it says nothing about the job
+    assert results["dropped_claims"] == 1
+
+
+@pytest.mark.parametrize("requirement", ["", "   "])
+def test_a_claim_with_a_blank_requirement_is_dropped(client, upload, runner, store, requirement):
+    store(make_job("t1", description="Tableau reporting for finance"))
+    runner.answers["check-0"] = {"grade": 2, "claims": [{**CLAIM, "requirement": requirement}]}
+
+    results = run(client, upload)
+
+    assert results["jobs"] == []
+    assert results["dropped_claims"] == 1
+
+
+def test_a_job_keeps_its_verified_claims_when_another_claim_is_dropped(client, upload, runner, store):
+    store(make_job("t1", description="Tableau reporting for finance"))
+    made_up = {**CLAIM, "job_quote": "lead a team of forty"}
+    runner.answers["check-0"] = {"grade": 2, "claims": [made_up, CLAIM]}
+
+    results = run(client, upload)
+
+    [job] = results["jobs"]
+    assert job["claims"] == [CLAIM]
+    assert results["dropped_claims"] == 1
+
+
+UNUSABLE_ANSWERS = [
+    pytest.param(None, id="call failed"),
+    pytest.param("not an object", id="not an object"),
+    pytest.param({"claims": [CLAIM]}, id="no grade"),
+    pytest.param({"grade": 2}, id="no claims"),
+    pytest.param({"grade": 2, "claims": "abc"}, id="claims is a string"),
+    pytest.param({"grade": 2, "claims": None}, id="claims is null"),
+    pytest.param({"grade": 2, "claims": {"requirement": "Tableau"}}, id="claims is an object"),
+    pytest.param({"grade": 3, "claims": [CLAIM]}, id="grade 3"),
+    pytest.param({"grade": -1, "claims": [CLAIM]}, id="grade -1"),
+    pytest.param({"grade": "1", "claims": [CLAIM]}, id="grade is a string"),
+    pytest.param({"grade": True, "claims": [CLAIM]}, id="grade is true"),  # JSON true must not read as 1
+    pytest.param({"grade": 1.0, "claims": [CLAIM]}, id="grade is 1.0"),
+]
+
+
+@pytest.mark.parametrize("answer", UNUSABLE_ANSWERS)
+def test_a_job_whose_check_is_unusable_is_skipped_and_the_others_still_show(
+        client, upload, runner, store, answer):
+    store(make_job("a1", description="Tableau Tableau reporting"),
+          make_job("a2", description="Tableau reporting"))
+    assert keyword_order(client, "tableau") == ["a1", "a2"]  # so check-0 is a1 and check-1 is a2
+    runner.answers["check-0"] = answer
+    runner.answers["check-1"] = {"grade": 2, "claims": [CLAIM]}
+
+    assert [job["job_id"] for job in run(client, upload)["jobs"]] == ["a2"]
+
+
+def test_no_check_is_submitted_when_no_job_qualifies(client, upload, runner):
+    results = run(client, upload, keywords=["zzzz"])
+
+    assert results == {"jobs": [], "dropped_claims": 0}
+    assert len(runner.submissions) == 1  # the CV summary and nothing else

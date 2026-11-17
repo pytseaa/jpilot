@@ -25,7 +25,7 @@ CV:
 Job ad:
 {description}"""
 
-JOB_EXTRACTION ="""Read the job ad below and reply with one JSON object that has these keys:
+JOB_EXTRACTION = """Read the job ad below and reply with one JSON object that has these keys:
 "region": "Hong Kong" if the job is in Hong Kong, "other" if it is clearly somewhere else, or "unknown".
 "employment_types": a list with each type the ad states, from "full-time", "part-time" and "contractor"; an empty list if it states none.
 "minimum_years": the years of experience the ad asks for, as one whole number: for a range such as "3-5", the lower figure; 0 for fresh graduate or entry-level wording; null if it says nothing about experience.

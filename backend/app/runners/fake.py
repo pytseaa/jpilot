@@ -36,8 +36,7 @@ class FakeRunner:
 
 
 def _grade_by_quoting(prompt):
-    """A grade 2 check whose quotes are the first three words of the CV text and of the ad in the prompt."""
-    # Read back from the prompt, so each quote is really in its source. Wording follows prompts.CHECK.
+    # Quotes the first three words of the CV text and the ad, read back from the prompt so both verify; the labels are prompts.CHECK's.
     cv_text = prompt.split("\nCV:\n", 1)[1].split("\n\nJob ad:\n", 1)[0]
     ad = prompt.split("\n\nJob ad:\n", 1)[1]
     cv_quote, job_quote = " ".join(cv_text.split()[:3]), " ".join(ad.split()[:3])

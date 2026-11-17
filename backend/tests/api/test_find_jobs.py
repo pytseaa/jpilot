@@ -90,14 +90,15 @@ def test_jobs_not_seen_in_the_last_30_days_are_never_returned(client):
     assert not ids(jobs) & {"h04", "h05", "h15"}  # seen 31, 90 and 40 days ago: closed
 
 
-def test_experience_band_and_industry_never_remove_a_job(client, upload):
-    # h16 asks for 12 years and is in banking; the candidate picks 0-2 years and insurance.
-    # The search must finish with the preferences set; retrieval itself never sees them.
-    base, _ = start(client, upload, employment_types=["full-time"], experience_band="0-2",
-                    industry="Insurance")
+def test_experience_band_and_industry_never_remove_a_job(client, upload, tmp_path):
+    # p1 asks for 12 years and is in banking; the candidate picks 0-2 years and insurance.
+    store(tmp_path, [make_job("p1", minimum_years=12, industry="Banking and finance",
+                              title="Tableau lead", description="Tableau reporting")])
+    base, _ = start(client, upload, keywords=["tableau"], employment_types=["full-time"],
+                    experience_band="0-2", industry="Insurance")
     assert wait_until_finished(client, base) == {"stage": "done"}
 
-    assert {"h16", "h17"} <= ids(qualifying(client, employment_types=["full-time"]))
+    assert ids(client.get(f"{base}/results").json()["jobs"]) == {"p1"}  # still on the shortlist
 
 
 def test_matching_ignores_letter_case(client):
@@ -151,7 +152,7 @@ def test_a_second_start_while_a_search_runs_is_refused(client, upload, held):
     assert second.status_code == 409
     held.set()
     assert wait_until_finished(client, base) == {"stage": "done"}  # the first search was not disturbed
-    assert client.get(f"{base}/results").status_code == 200  # what it shows is tested in test_check_jobs
+    assert ids(client.get(f"{base}/results").json()["jobs"]) == {"k-title", "k-desc"}
 
 
 def test_a_search_for_another_request_is_refused_while_one_runs(client, upload, held):
@@ -213,7 +214,7 @@ def test_after_a_failed_search_the_candidate_can_search_again(client, upload, mo
 
     assert client.post(f"{base}/search", json=body).status_code == 200
     assert wait_until_finished(client, base) == {"stage": "done"}
-    assert client.get(f"{base}/results").status_code == 200  # what it shows is tested in test_check_jobs
+    assert ids(client.get(f"{base}/results").json()["jobs"]) == {"k-title", "k-desc"}
 
 
 def test_results_are_refused_until_the_search_is_done(client, upload, held):
@@ -241,7 +242,7 @@ def store(tmp_path, jobs):
         conn.commit()
 
 
-def test_a_database_whose_jobs_have_no_words_left_finishes_with_no_jobs(client, tmp_path):
+def test_a_database_whose_jobs_have_no_words_left_has_no_qualifying_jobs(client, tmp_path):
     with closing(db.connect(tmp_path)) as conn:
         conn.execute("DELETE FROM jobs")
         conn.commit()

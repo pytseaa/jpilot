@@ -11,11 +11,7 @@ SHORTLIST_SIZE = 5
 
 
 def check_jobs(jobs, cv_text, summary, runner):
-    """One submission with one prompt per job. Return the shortlist and the dropped-claim count.
-
-    A job comes back with its grade and its verified claims. Grade 0 jobs, jobs whose call failed or whose
-    answer is not what the prompt asked for, and jobs with no verified claim left are left out. The shortlist
-    is at most SHORTLIST_SIZE jobs, grade 2 before grade 1, and keyword order within a grade."""
+    """One submission with one prompt per job. Return the shortlist and the dropped-claim count."""
     if not jobs:
         return [], 0
     submission = [{"id": f"check-{i}", "required_keys": CHECK_KEYS,
@@ -28,8 +24,8 @@ def check_jobs(jobs, cv_text, summary, runner):
         answer = _answer(records[f"check-{i}"])
         if answer is None or answer.grade == 0:
             continue
-        verified, unverified = _verified(answer.claims, cv_text, job["description"])
-        dropped += unverified
+        verified, not_found = _verified(answer.claims, cv_text, job["description"])
+        dropped += not_found
         if verified:
             checked.append({**job, "grade": answer.grade, "claims": [c.model_dump() for c in verified]})
     checked.sort(key=lambda job: -job["grade"])  # a stable sort keeps the keyword order within a grade
@@ -47,10 +43,7 @@ def _answer(record):
 
 
 def _verified(raw_claims, cv_text, description):
-    """The claims whose quotes are found in the CV text and in the job's description, and how many were not.
-
-    The CV summary and the requirements list never take part: only source text can verify a quote.
-    A claim with a missing or unusable field is dropped, and Qwen is not asked to fix it."""
+    """The claims with both quotes found, and how many were dropped. Only the source texts verify a quote (ADR 0003)."""
     verified, dropped = [], 0
     for raw in raw_claims:
         try:
@@ -68,6 +61,6 @@ def _verified(raw_claims, cv_text, description):
 def _found(quote, source):
     """True when the quote is in the source as whole words, ignoring letter case and spacing."""
     words = " ".join(quote.lower().split())
-    if not words:  # an empty quote would match at every gap, so it never counts as found
+    if not re.search(r"\w", words):  # an empty or punctuation-only quote says nothing, so it is never found
         return False
     return re.search(rf"(?<!\w){re.escape(words)}(?!\w)", " ".join(source.lower().split())) is not None

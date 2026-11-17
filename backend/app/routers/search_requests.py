@@ -59,7 +59,7 @@ def _stored(request, request_id):
 
 
 def _run_search(data_dir, runner, stored):
-    # shortcut: only a raised error ends a search, so one that hangs blocks every session until restart, add a timeout once a search can wait on Qwen.
+    # shortcut: only a raised error ends a search, so a hung TACC submission blocks every session until restart (TaccRunner polls with no timeout of its own), add one in the runner once a real run hangs.
     try:
         with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
             qualifying = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
