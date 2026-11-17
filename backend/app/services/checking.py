@@ -5,13 +5,16 @@ from pydantic import ValidationError
 
 from app import prompts
 from app.schemas.check import CheckAnswer, Claim
+from app.services import ranking
 
 CHECK_KEYS = ["grade", "claims"]
 SHORTLIST_SIZE = 5
 
 
-def check_jobs(jobs, cv_text, summary, runner):
-    """One submission with one prompt per job. Return the shortlist and the dropped-claim count."""
+def check_jobs(jobs, cv_text, summary, runner, experience_band, industry):
+    """One submission with one prompt per job. Return the shortlist and the dropped-claim count.
+
+    The preferences only order the shortlist, so they never reach a prompt."""
     if not jobs:
         return [], 0
     submission = [{"id": f"check-{i}", "required_keys": CHECK_KEYS,
@@ -28,8 +31,7 @@ def check_jobs(jobs, cv_text, summary, runner):
         dropped += not_found
         if verified:
             checked.append({**job, "grade": answer.grade, "claims": [c.model_dump() for c in verified]})
-    checked.sort(key=lambda job: -job["grade"])  # a stable sort keeps the keyword order within a grade
-    return checked[:SHORTLIST_SIZE], dropped
+    return ranking.rank(checked, experience_band, industry)[:SHORTLIST_SIZE], dropped
 
 
 def _answer(record):

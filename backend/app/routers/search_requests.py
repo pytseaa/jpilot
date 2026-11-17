@@ -64,7 +64,7 @@ def _run_search(data_dir, runner, stored):
         with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
             qualifying = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
         stored.jobs, stored.dropped_claims = checking.check_jobs(
-            qualifying, stored.cv_text, stored.summary, runner)
+            qualifying, stored.cv_text, stored.summary, runner, stored.experience_band, stored.industry)
         stored.stage = "done"
     except Exception:  # whatever went wrong, the candidate must see "failed", not a search that never ends
         logger.exception("The search for request %s failed", stored.id)
