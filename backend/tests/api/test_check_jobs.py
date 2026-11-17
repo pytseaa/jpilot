@@ -173,6 +173,27 @@ def test_jobs_of_the_same_grade_keep_the_keyword_order(client, upload, runner, s
     assert [job["job_id"] for job in run(client, upload)["jobs"]] == ["s2", "s1"]
 
 
+def test_at_equal_grade_a_confirmed_job_comes_before_an_unverified_one(client, upload, runner, store):
+    store(make_job("u1", region="unknown", description="Tableau Tableau reporting"),
+          make_job("c1", description="Tableau reporting"))
+    assert keyword_order(client, "tableau") == ["u1", "c1"]  # so the Unverified job leads on keyword score alone
+    runner.answers["check-0"] = {"grade": 2, "claims": [CLAIM]}
+    runner.answers["check-1"] = {"grade": 2, "claims": [CLAIM]}
+
+    assert [job["job_id"] for job in run(client, upload)["jobs"]] == ["c1", "u1"]
+
+
+def test_at_equal_grade_and_status_the_job_with_more_verified_claims_comes_first(client, upload, runner, store):
+    store(make_job("m1", description="Tableau Tableau reporting"),
+          make_job("m2", description="Tableau reporting"))
+    assert keyword_order(client, "tableau") == ["m1", "m2"]  # so the job with fewer claims leads on keyword score alone
+    other = {"requirement": "Reporting", "cv_quote": "retail bank", "job_quote": "reporting"}
+    runner.answers["check-0"] = {"grade": 2, "claims": [CLAIM]}
+    runner.answers["check-1"] = {"grade": 2, "claims": [CLAIM, other]}
+
+    assert [job["job_id"] for job in run(client, upload)["jobs"]] == ["m2", "m1"]
+
+
 def test_at_most_five_jobs_are_shown(client, upload, runner, store):
     store(*[make_job(f"f{n}", description="Tableau reporting for finance") for n in range(1, 8)])
     for n in range(7):
