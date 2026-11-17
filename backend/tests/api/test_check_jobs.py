@@ -194,6 +194,100 @@ def test_at_equal_grade_and_status_the_job_with_more_verified_claims_comes_first
     assert [job["job_id"] for job in run(client, upload)["jobs"]] == ["m2", "m1"]
 
 
+def shown_ids(client, upload, runner, store, jobs, answers=None, **preferences):
+    """Store jobs (id, fields) with one ad text, so keyword order is job id order, and return the ids as shown.
+
+    Every job is graded 2 with one verified claim, unless `answers` gives its own check answer."""
+    ids = [job_id for job_id, _ in jobs]
+    store(*[make_job(job_id, description="Tableau reporting for finance", **fields) for job_id, fields in jobs])
+    assert keyword_order(client, "tableau") == ids
+    for n, job_id in enumerate(ids):
+        runner.answers[f"check-{n}"] = (answers or {}).get(job_id, {"grade": 2, "claims": [CLAIM]})
+    return [job["job_id"] for job in run(client, upload, **preferences)["jobs"]]
+
+
+@pytest.mark.parametrize("fewer, more", [
+    pytest.param({"minimum_years": 4, "industry": "Banking and finance"},
+                 {"minimum_years": 4, "industry": "Insurance"}, id="industry"),
+    pytest.param({"minimum_years": 10, "industry": "Insurance"},
+                 {"minimum_years": 4, "industry": "Insurance"}, id="experience band"),
+])
+def test_at_equal_evidence_the_job_that_meets_more_preferences_comes_first(
+        client, upload, runner, store, fewer, more):
+    ids = shown_ids(client, upload, runner, store, [("p1", fewer), ("p2", more)],
+                    experience_band="3-5", industry="Insurance")
+
+    assert ids == ["p2", "p1"]  # p1 leads on keyword order alone, and p1 is still shown
+
+
+UNKNOWN = [pytest.param({"minimum_years": None}, id="minimum years"),
+           pytest.param({"industry": "unknown"}, id="industry")]
+
+
+@pytest.mark.parametrize("fields", UNKNOWN)
+def test_a_job_with_an_unknown_value_is_not_penalised(client, upload, runner, store, fields):
+    known = {"minimum_years": 4, "industry": "Insurance"}
+    ids = shown_ids(client, upload, runner, store, [("a1", {**known, **fields}), ("b1", known)],
+                    experience_band="3-5", industry="Insurance")
+
+    assert ids == ["a1", "b1"]  # unknown counts as met, so a1 ties with b1 and keeps its keyword place
+
+
+@pytest.mark.parametrize("fields", UNKNOWN)
+def test_a_job_with_an_unknown_value_beats_one_that_misses_the_preference(
+        client, upload, runner, store, fields):
+    miss = {"minimum_years": 10, "industry": "Banking and finance"}
+    known = {"minimum_years": 4, "industry": "Insurance"}
+    ids = shown_ids(client, upload, runner, store, [("a1", miss), ("b1", {**known, **fields})],
+                    experience_band="3-5", industry="Insurance")
+
+    assert ids == ["b1", "a1"]
+
+
+@pytest.mark.parametrize("first, second, preferences", [
+    pytest.param({"minimum_years": 10, "industry": "Insurance"}, {"minimum_years": 4, "industry": "Insurance"},
+                 {"industry": "Insurance"}, id="blank band"),
+    pytest.param({"minimum_years": 4, "industry": "Banking and finance"}, {"minimum_years": 4, "industry": "Insurance"},
+                 {"experience_band": "3-5"}, id="blank industry"),
+    pytest.param({"minimum_years": 10, "industry": "Banking and finance"}, {"minimum_years": 4, "industry": "Insurance"},
+                 {}, id="both blank"),
+])
+def test_a_blank_preference_counts_as_met_for_every_job_so_it_does_not_change_the_order(
+        client, upload, runner, store, first, second, preferences):
+    ids = shown_ids(client, upload, runner, store, [("a1", first), ("b1", second)], **preferences)
+
+    assert ids == ["a1", "b1"]  # the blank preference ties the two jobs, so keyword order stays
+
+
+MEETS_BOTH = {"minimum_years": 4, "industry": "Insurance"}
+MEETS_NONE = {"minimum_years": 10, "industry": "Banking and finance"}
+
+
+def test_preferences_never_move_a_job_across_a_grade(client, upload, runner, store):
+    ids = shown_ids(client, upload, runner, store, [("a1", MEETS_BOTH), ("b1", MEETS_NONE)],
+                    answers={"a1": {"grade": 1, "claims": [CLAIM]}},
+                    experience_band="3-5", industry="Insurance")
+
+    assert ids == ["b1", "a1"]  # grade 2 first, though a1 meets both preferences and b1 meets none
+
+
+def test_preferences_never_move_a_job_across_the_confirmed_status(client, upload, runner, store):
+    ids = shown_ids(client, upload, runner, store,
+                    [("a1", {**MEETS_BOTH, "region": "unknown"}), ("b1", MEETS_NONE)],
+                    experience_band="3-5", industry="Insurance")
+
+    assert ids == ["b1", "a1"]  # the Confirmed job first, though a1 is Unverified and meets both
+
+
+def test_preferences_never_move_a_job_across_the_claim_count(client, upload, runner, store):
+    other = {"requirement": "Reporting", "cv_quote": "retail bank", "job_quote": "reporting"}
+    ids = shown_ids(client, upload, runner, store, [("a1", MEETS_BOTH), ("b1", MEETS_NONE)],
+                    answers={"b1": {"grade": 2, "claims": [CLAIM, other]}},
+                    experience_band="3-5", industry="Insurance")
+
+    assert ids == ["b1", "a1"]  # two claims first, though a1 meets both preferences and b1 meets none
+
+
 def test_at_most_five_jobs_are_shown(client, upload, runner, store):
     store(*[make_job(f"f{n}", description="Tableau reporting for finance") for n in range(1, 8)])
     for n in range(7):
