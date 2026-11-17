@@ -249,8 +249,8 @@ def test_a_job_with_an_unknown_value_beats_one_that_misses_the_preference(
                  {"industry": "Insurance"}, id="blank band"),
     pytest.param({"minimum_years": 4, "industry": "Banking and finance"}, {"minimum_years": 4, "industry": "Insurance"},
                  {"experience_band": "3-5"}, id="blank industry"),
-    pytest.param({"minimum_years": 10, "industry": "Banking and finance"}, {"minimum_years": 4, "industry": "Insurance"},
-                 {}, id="both blank"),
+    pytest.param({"minimum_years": 10, "industry": "Banking and finance"},
+                 {"minimum_years": 4, "industry": "Insurance"}, {}, id="both blank"),
 ])
 def test_a_blank_preference_counts_as_met_for_every_job_so_it_does_not_change_the_order(
         client, upload, runner, store, first, second, preferences):
@@ -286,6 +286,33 @@ def test_preferences_never_move_a_job_across_the_claim_count(client, upload, run
                     experience_band="3-5", industry="Insurance")
 
     assert ids == ["b1", "a1"]  # two claims first, though a1 meets both preferences and b1 meets none
+
+
+@pytest.mark.parametrize("near, far", [(2, 10), (6, 10), (2, 0)])
+def test_outside_the_band_the_smaller_years_gap_comes_first_in_both_directions(
+        client, upload, runner, store, near, far):
+    ids = shown_ids(client, upload, runner, store,
+                    [("a1", {"minimum_years": far}), ("b1", {"minimum_years": near})],
+                    experience_band="3-5")
+
+    assert ids == ["b1", "a1"]  # a1 leads on keyword order alone; b1 is 1 year outside the band, a1 is further out
+
+
+def test_the_count_of_met_preferences_decides_before_the_years_gap(client, upload, runner, store):
+    ids = shown_ids(client, upload, runner, store,
+                    [("a1", {"minimum_years": 6, "industry": "Banking and finance"}),
+                     ("b1", {"minimum_years": 10, "industry": "Insurance"})],
+                    experience_band="3-5", industry="Insurance")
+
+    assert ids == ["b1", "a1"]  # b1 meets industry and misses the band by 5; a1 misses both but by 1
+
+
+def test_a_zero_year_job_ranks_below_a_four_year_job_in_the_3_5_band(client, upload, runner, store):
+    ids = shown_ids(client, upload, runner, store,
+                    [("a1", {"minimum_years": 0}), ("b1", {"minimum_years": 4})],
+                    experience_band="3-5")
+
+    assert ids == ["b1", "a1"]  # 4 is inside the band and 0 is not, so the preference count decides here
 
 
 def test_at_most_five_jobs_are_shown(client, upload, runner, store):

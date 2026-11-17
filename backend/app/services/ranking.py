@@ -6,12 +6,15 @@ BANDS = {"0-2": (0, 2), "3-5": (3, 5), "6-9": (6, 9), "10+": (10, float("inf"))}
 def rank(jobs, experience_band, industry):
     """The jobs best first. They arrive in keyword order, which a stable sort keeps as the last key."""
     return sorted(jobs, key=lambda job: (-job["grade"], job["unverified"], -len(job["claims"]),
-                                         -_preferences_met(job, experience_band, industry)))
+                                         _fit(job, experience_band, industry)))
 
 
-def _preferences_met(job, experience_band, industry):
-    """How many of the two soft preferences the job meets. A blank preference or an unknown value counts as met."""
+def _fit(job, experience_band, industry):
+    """Preference fit as a sort key: the preferences met (most first), then the years gap (smallest first).
+
+    A blank preference or an unknown value counts as met and has no gap. The gap is 0 inside the band."""
     years = job["minimum_years"]
     low, high = BANDS.get(experience_band, (0, float("inf")))
-    return (industry is None or job["industry"] in (industry, "unknown")) + (
-        years is None or low <= years <= high)
+    met = (industry is None or job["industry"] in (industry, "unknown")) + (years is None or low <= years <= high)
+    gap = 0 if years is None else max(low - years, years - high, 0)
+    return -met, gap
