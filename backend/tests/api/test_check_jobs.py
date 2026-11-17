@@ -14,6 +14,10 @@ CV_TEXT = "Built Tableau dashboards for a retail bank"
 CV = text_pdf(CV_TEXT)
 # Found in CV_TEXT and in the description of the jobs below, so a check that returns it is verified.
 CLAIM = {"requirement": "Tableau", "cv_quote": "Tableau dashboards", "job_quote": "Tableau reporting"}
+OTHER_CLAIM = {"requirement": "Reporting", "cv_quote": "retail bank", "job_quote": "reporting"}
+# Job fields that meet, or miss, both preferences of a candidate who picked the 3-5 band and Insurance.
+MEETS_BOTH = {"minimum_years": 4, "industry": "Insurance"}
+MEETS_NONE = {"minimum_years": 10, "industry": "Banking and finance"}
 
 
 @pytest.fixture(autouse=True)
@@ -187,15 +191,14 @@ def test_at_equal_grade_and_status_the_job_with_more_verified_claims_comes_first
     store(make_job("m1", description="Tableau Tableau reporting"),
           make_job("m2", description="Tableau reporting"))
     assert keyword_order(client, "tableau") == ["m1", "m2"]  # so the job with fewer claims leads on keyword score alone
-    other = {"requirement": "Reporting", "cv_quote": "retail bank", "job_quote": "reporting"}
     runner.answers["check-0"] = {"grade": 2, "claims": [CLAIM]}
-    runner.answers["check-1"] = {"grade": 2, "claims": [CLAIM, other]}
+    runner.answers["check-1"] = {"grade": 2, "claims": [CLAIM, OTHER_CLAIM]}
 
     assert [job["job_id"] for job in run(client, upload)["jobs"]] == ["m2", "m1"]
 
 
 def shown_ids(client, upload, runner, store, jobs, answers=None, **preferences):
-    """Store jobs (id, fields) with one ad text, so keyword order is job id order, and return the ids as shown.
+    """Store jobs (id, fields) that share one ad text, so keyword order is job id order, and return the ids as shown.
 
     Every job is graded 2 with one verified claim, unless `answers` gives its own check answer."""
     ids = [job_id for job_id, _ in jobs]
@@ -226,8 +229,7 @@ UNKNOWN = [pytest.param({"minimum_years": None}, id="minimum years"),
 
 @pytest.mark.parametrize("fields", UNKNOWN)
 def test_a_job_with_an_unknown_value_is_not_penalised(client, upload, runner, store, fields):
-    known = {"minimum_years": 4, "industry": "Insurance"}
-    ids = shown_ids(client, upload, runner, store, [("a1", {**known, **fields}), ("b1", known)],
+    ids = shown_ids(client, upload, runner, store, [("a1", {**MEETS_BOTH, **fields}), ("b1", MEETS_BOTH)],
                     experience_band="3-5", industry="Insurance")
 
     assert ids == ["a1", "b1"]  # unknown counts as met, so a1 ties with b1 and keeps its keyword place
@@ -236,9 +238,7 @@ def test_a_job_with_an_unknown_value_is_not_penalised(client, upload, runner, st
 @pytest.mark.parametrize("fields", UNKNOWN)
 def test_a_job_with_an_unknown_value_beats_one_that_misses_the_preference(
         client, upload, runner, store, fields):
-    miss = {"minimum_years": 10, "industry": "Banking and finance"}
-    known = {"minimum_years": 4, "industry": "Insurance"}
-    ids = shown_ids(client, upload, runner, store, [("a1", miss), ("b1", {**known, **fields})],
+    ids = shown_ids(client, upload, runner, store, [("a1", MEETS_NONE), ("b1", {**MEETS_BOTH, **fields})],
                     experience_band="3-5", industry="Insurance")
 
     assert ids == ["b1", "a1"]
@@ -259,10 +259,6 @@ def test_a_blank_preference_counts_as_met_for_every_job_so_it_does_not_change_th
     assert ids == ["a1", "b1"]  # the blank preference ties the two jobs, so keyword order stays
 
 
-MEETS_BOTH = {"minimum_years": 4, "industry": "Insurance"}
-MEETS_NONE = {"minimum_years": 10, "industry": "Banking and finance"}
-
-
 def test_preferences_never_move_a_job_across_a_grade(client, upload, runner, store):
     ids = shown_ids(client, upload, runner, store, [("a1", MEETS_BOTH), ("b1", MEETS_NONE)],
                     answers={"a1": {"grade": 1, "claims": [CLAIM]}},
@@ -280,9 +276,8 @@ def test_preferences_never_move_a_job_across_the_confirmed_status(client, upload
 
 
 def test_preferences_never_move_a_job_across_the_claim_count(client, upload, runner, store):
-    other = {"requirement": "Reporting", "cv_quote": "retail bank", "job_quote": "reporting"}
     ids = shown_ids(client, upload, runner, store, [("a1", MEETS_BOTH), ("b1", MEETS_NONE)],
-                    answers={"b1": {"grade": 2, "claims": [CLAIM, other]}},
+                    answers={"b1": {"grade": 2, "claims": [CLAIM, OTHER_CLAIM]}},
                     experience_band="3-5", industry="Insurance")
 
     assert ids == ["b1", "a1"]  # two claims first, though a1 meets both preferences and b1 meets none
@@ -312,7 +307,43 @@ def test_a_zero_year_job_ranks_below_a_four_year_job_in_the_3_5_band(client, upl
                     [("a1", {"minimum_years": 0}), ("b1", {"minimum_years": 4})],
                     experience_band="3-5")
 
-    assert ids == ["b1", "a1"]  # 4 is inside the band and 0 is not, so the preference count decides here
+    assert ids == ["b1", "a1"]  # the ticket's example; the count and the gap both favour b1, so it pins neither key
+
+
+def test_an_unknown_minimum_does_not_jump_ahead_of_a_job_inside_the_band(client, upload, runner, store):
+    ids = shown_ids(client, upload, runner, store,
+                    [("a1", {"minimum_years": 4}), ("b1", {"minimum_years": None})],
+                    experience_band="3-5")
+
+    assert ids == ["a1", "b1"]  # unknown counts as met and has no gap, so it only ties with a1
+
+
+def test_an_unknown_minimum_has_no_gap_so_it_beats_a_job_outside_the_band_on_equal_count(
+        client, upload, runner, store):
+    ids = shown_ids(client, upload, runner, store,
+                    [("a1", {"minimum_years": 6, "industry": "Insurance"}),
+                     ("b1", {"minimum_years": None, "industry": "Banking and finance"})],
+                    experience_band="3-5", industry="Insurance")
+
+    assert ids == ["b1", "a1"]  # each meets one preference; b1 has no gap and a1 is 1 year outside the band
+
+
+def test_every_qualifying_job_is_ranked_before_the_cut_to_five(client, upload, runner, store):
+    grade_1 = {"grade": 1, "claims": [CLAIM]}
+    ids = shown_ids(client, upload, runner, store, [(f"f{n}", {}) for n in range(1, 8)],
+                    answers={f"f{n}": grade_1 for n in range(1, 7)})
+
+    assert ids == ["f7", "f1", "f2", "f3", "f4"]  # f7 is seventh in keyword order but the only grade 2
+
+
+@pytest.mark.parametrize("band, edge, middle", [
+    ("0-2", 0, 1), ("0-2", 2, 1), ("3-5", 3, 4), ("3-5", 5, 4), ("6-9", 6, 7), ("6-9", 9, 7), ("10+", 10, 15)])
+def test_a_job_at_the_edge_of_the_band_meets_it(client, upload, runner, store, band, edge, middle):
+    ids = shown_ids(client, upload, runner, store,
+                    [("a1", {"minimum_years": edge}), ("b1", {"minimum_years": middle})],
+                    experience_band=band)
+
+    assert ids == ["a1", "b1"]  # the edge is inside the band, so a1 ties with b1 and keeps its keyword place
 
 
 def test_at_most_five_jobs_are_shown(client, upload, runner, store):
