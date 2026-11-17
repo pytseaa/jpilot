@@ -7,14 +7,21 @@ export type Reviewed = Preferences & { summary: string; keywords: string[]; targ
 export type Review = Reviewed & { id: string };
 // null until Search is pressed.
 export type Stage = "searching" | "done" | "failed" | null;
+/** A reason the CV fits the job. The backend sends it only when both quotes were found in their source. */
+export type Claim = { requirement: string; cv_quote: string; job_quote: string };
 export type ResultJob = {
   job_id: string;
   title: string | null;
   employer: string | null;
   location: string | null;
   apply_link: string | null;
+  posted_date: string | null;
+  collected: string;
   unverified: boolean;
+  grade: 1 | 2;
+  claims: Claim[];
 };
+export type Results = { jobs: ResultJob[]; dropped_claims: number };
 
 async function call<T>(url: string, init: RequestInit = {}): Promise<T> {
   let res: Response;
@@ -52,6 +59,6 @@ export function getStage(id: string): Promise<{ stage: Stage }> {
   return call(`/api/search-requests/${id}/status`);
 }
 
-export function getJobs(id: string): Promise<{ jobs: ResultJob[] }> {
+export function getResults(id: string): Promise<Results> {
   return call(`/api/search-requests/${id}/results`);
 }

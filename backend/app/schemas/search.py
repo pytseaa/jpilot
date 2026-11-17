@@ -1,4 +1,8 @@
+from typing import Literal
+
 from pydantic import BaseModel
+
+from app.schemas.check import Claim
 
 
 class Status(BaseModel):
@@ -16,7 +20,10 @@ class ResultJob(BaseModel):
     posted_date: str | None
     collected: str
     unverified: bool
+    grade: Literal[1, 2]
+    claims: list[Claim]
 
 
 class Results(BaseModel):
     jobs: list[ResultJob]
+    dropped_claims: int  # claims whose quote was not found, counted apart from the shown ones
