@@ -6,7 +6,7 @@ from app.schemas.check import Claim
 
 
 class Status(BaseModel):
-    """Where a search is: searching, done or failed. None until the candidate presses Search."""
+    """Where a search is: searching, refining round 1 or 2, checking jobs, done or failed. None until the candidate presses Search."""
     stage: str | None
 
 

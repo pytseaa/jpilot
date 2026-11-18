@@ -122,7 +122,8 @@ def test_a_claim_with_a_missing_quote_is_dropped_and_qwen_is_not_asked_again(cli
 
     assert results["jobs"] == []
     assert results["dropped_claims"] == 1
-    assert len(runner.submissions) == 2  # the CV summary, then one check submission, and no retry
+    # The CV summary, a refinement round that adds nothing, then one check submission, and no retry.
+    assert [submission[0]["id"] for submission in runner.submissions] == ["cv-summary", "refine-1", "check-0"]
 
 
 def test_a_job_graded_0_never_appears_even_with_a_verified_claim(client, upload, runner, store):
@@ -444,4 +445,5 @@ def test_no_check_is_submitted_when_no_job_qualifies(client, upload, runner):
     results = run(client, upload, keywords=["zzzz"])
 
     assert results == {"jobs": [], "dropped_claims": 0}
-    assert len(runner.submissions) == 1  # the CV summary and nothing else
+    # The fixture jobs pass the hard filters without matching, so a refinement round runs and adds nothing.
+    assert [submission[0]["id"] for submission in runner.submissions] == ["cv-summary", "refine-1"]

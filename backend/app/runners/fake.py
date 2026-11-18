@@ -23,8 +23,12 @@ class FakeRunner:
 
     def _answer(self, item):
         # A check with no canned answer grades 2 and quotes the start of its own CV text and ad, so both verify.
-        if item["id"] not in self.answers and item["id"].startswith("check-"):
-            return _grade_by_quoting(item["prompt"])
+        # A refinement with no canned answer adds no keywords.
+        if item["id"] not in self.answers:
+            if item["id"].startswith("check-"):
+                return _grade_by_quoting(item["prompt"])
+            if item["id"].startswith("refine-"):
+                return {"keywords": []}
         return self.answers[item["id"]]
 
     @staticmethod

@@ -12,7 +12,7 @@ from app.runners.tacc import SubmissionFailed
 from app.schemas.search import Results, Status
 from app.schemas.search_request import (
     BlankIsNone, EmploymentType, ExperienceBand, Industry, Review, Reviewed)
-from app.services import checking, cv_intake, retrieval
+from app.services import checking, cv_intake, refinement
 
 router = APIRouter(prefix="/api/search-requests")
 logger = logging.getLogger(__name__)
@@ -62,7 +62,10 @@ def _run_search(data_dir, runner, stored):
     # shortcut: only a raised error ends a search, so a hung TACC submission blocks every session until restart (TaccRunner polls with no timeout of its own), add one in the runner once a real run hangs.
     try:
         with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
-            qualifying = retrieval.find_qualifying(conn, stored.keywords, stored.employment_types)
+            qualifying = refinement.widen(
+                conn, stored.keywords, stored.summary, stored.target_role, stored.employment_types, runner,
+                lambda round_number: setattr(stored, "stage", f"refining round {round_number}"))
+        stored.stage = "checking jobs"
         stored.jobs, stored.dropped_claims = checking.check_jobs(
             qualifying, stored.cv_text, stored.summary, runner, stored.experience_band, stored.industry)
         stored.stage = "done"
@@ -77,7 +80,7 @@ def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
     stored = _stored(request, request_id)
     with _start_lock:  # two starts at the same moment must not both pass the check
         # One search at a time for the whole backend; list() copies, as an upload may add a request.
-        if any(other.stage == "searching" for other in list(request.app.state.requests.values())):
+        if any(other.stage not in (None, "done", "failed") for other in list(request.app.state.requests.values())):
             raise HTTPException(409, "A search is already running.")
         stored.stage = "searching"
     vars(stored).update(reviewed.model_dump())

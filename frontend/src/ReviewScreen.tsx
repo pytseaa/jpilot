@@ -6,6 +6,13 @@ import { BandAndIndustry, EmploymentPills, NO_EMPLOYMENT_TYPE } from "./Preferen
 type Props = { review: Review; fileName: string | null; onRestart: () => void };
 
 const POLL_MS = 2000;
+// What the progress line says for each stage that is still running.
+const RUNNING_TEXT: Partial<Record<NonNullable<Stage>, string>> = {
+  searching: "Searching the job database...",
+  "refining round 1": "Too few jobs matched, so the search is widening with new keywords (round 1)...",
+  "refining round 2": "Still too few jobs, so the search is widening again (round 2)...",
+  "checking jobs": "Checking the jobs against your CV...",
+};
 
 // Not a <form>: pressing Enter in a field must never act as the Search button.
 export function ReviewScreen({ review, fileName, onRestart }: Props) {
@@ -16,7 +23,7 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<Stage>(null);
   const [results, setResults] = useState<Results | null>(null);
-  const searching = stage === "searching";
+  const searching = stage !== null && stage in RUNNING_TEXT;
 
   const update = (patch: Partial<Reviewed>) => setValues({ ...values, ...patch });
 
@@ -28,7 +35,7 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
         const { stage: next } = await getStage(id);
         if (next === "done") setResults(await getResults(id));
         setError("");
-        if (next !== "searching") setStage(next);
+        setStage(next);
       } catch (err) {
         // The backend may still be searching, so keep the stage and poll again instead of giving up.
         setError(err instanceof Error ? err.message : String(err));
@@ -124,7 +131,7 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
         </div>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
-      {searching && <p role="status" className="note">Searching and checking jobs...</p>}
+      {stage && searching && <p role="status" className="note">{RUNNING_TEXT[stage]}</p>}
       {stage === "failed" && (
         <p role="alert" className="error">The search failed. Please press Search to try again.</p>
       )}
