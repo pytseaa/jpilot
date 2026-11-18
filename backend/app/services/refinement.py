@@ -22,7 +22,9 @@ def widen(conn, keywords, summary, target_role, employment_types, runner, on_rou
             break
         on_round(round_number)
         keywords += _new_keywords(round_number, keywords, summary, target_role, runner)
-        qualifying = retrieval.find_qualifying(conn, keywords, employment_types)
+        # A round below RESULT_LIMIT is uncut, so none of the earlier jobs can be pushed out of the next one.
+        qualifying = retrieval.find_qualifying(
+            conn, keywords, employment_types, {job["job_id"] for job in qualifying})
     return qualifying
 
 

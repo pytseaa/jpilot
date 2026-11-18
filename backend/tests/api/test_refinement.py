@@ -8,6 +8,7 @@ from searches import wait_until_finished
 
 from app import db
 from app.runners.fake import FakeRunner
+from app.services import retrieval
 from app.services.ingestion import INSERT
 
 CV = text_pdf("Built Tableau dashboards for a retail bank")
@@ -111,6 +112,28 @@ def test_an_unusable_refinement_answer_ends_refining_and_the_search_goes_on(
 
     assert shown(client, upload) == {"t1"}
     assert "refine-1" in submitted(runner)  # the round was tried
+
+
+def checked_ids(runner):
+    """The job ids in the last submission, in prompt order. Each test ad ends with its own job id."""
+    return [item["prompt"].split()[-1] for item in runner.submissions[-1]]
+
+
+def test_when_more_than_20_qualify_jobs_from_the_earlier_round_come_first_and_the_best_others_fill_the_rest(
+        client, upload, runner, store):
+    earlier = [make_job(f"e{n:02}", description=f"Tableau reporting e{n:02}") for n in range(1, 16)]
+    # "Looker Looker" outscores the earlier jobs once both keywords count, so score order alone would drop earlier jobs.
+    others = [make_job(f"n{n:02}", description=f"Looker Looker dashboards n{n:02}") for n in range(1, 9)]
+    store(*earlier, *others)
+    runner.answers["refine-1"] = {"keywords": ["looker"]}
+    with closing(db.connect(client.app.state.data_dir)) as conn:
+        by_score = [job["job_id"] for job in retrieval.find_qualifying(conn, ["tableau", "looker"], ["full-time"])]
+    assert by_score[:8] == [f"n{n:02}" for n in range(1, 9)]  # so the 8 others would come first and push out earlier jobs
+
+    shown(client, upload)
+
+    # All 15 earlier jobs, then the 5 best others by keyword score. Equal scores go by job id.
+    assert checked_ids(runner) == [f"e{n:02}" for n in range(1, 16)] + [f"n{n:02}" for n in range(1, 6)]
 
 
 def test_the_status_says_refining_round_1_and_a_second_search_is_refused_meanwhile(
