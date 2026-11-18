@@ -114,6 +114,79 @@ def test_an_unusable_refinement_answer_ends_refining_and_the_search_goes_on(
     assert "refine-1" in submitted(runner)  # the round was tried
 
 
+def prompt_of(runner, prompt_id):
+    [prompt] = [s[0]["prompt"] for s in runner.submissions if s[0]["id"] == prompt_id]
+    return prompt
+
+
+def test_two_extra_rounds_run_and_a_third_never_does(client, upload, runner, store):
+    store(make_job("t1", description="Tableau reporting"), make_job("t2", description="Looker dashboards"),
+          make_job("t3", description="Qlik dashboards"), make_job("u1", description="Excel macros"))
+    runner.answers["refine-1"] = {"keywords": ["looker"]}
+    runner.answers["refine-2"] = {"keywords": ["qlik"]}
+    runner.answers["refine-3"] = {"keywords": ["excel"]}  # would bring in u1, if a third round ran
+
+    assert shown(client, upload) == {"t1", "t2", "t3"}  # t1 is the candidate's own match, kept through both rounds
+    assert submitted(runner) == ["cv-summary", "refine-1", "refine-2", "check-0"]
+
+
+def test_refining_stops_after_round_1_once_20_jobs_qualify(client, upload, runner, store):
+    store(*[make_job(f"t{n:02}", description=f"Tableau reporting t{n:02}") for n in range(1, 20)],
+          make_job("l1", description="Looker dashboards l1"), make_job("q1", description="Qlik dashboards q1"))
+    runner.answers["refine-1"] = {"keywords": ["looker"]}  # the 20th qualifying job
+    runner.answers["refine-2"] = {"keywords": ["qlik"]}
+
+    shown(client, upload)
+
+    assert submitted(runner) == ["cv-summary", "refine-1", "check-0"]
+    assert "q1" not in checked_ids(runner) and "l1" in checked_ids(runner)
+    assert len(runner.submissions[-1]) == 20
+
+
+def test_refining_stops_after_round_1_once_every_job_passing_the_hard_filters_qualifies(
+        client, upload, runner, store):
+    store(make_job("t1", description="Tableau reporting"), make_job("t2", description="Looker dashboards"))
+    runner.answers["refine-1"] = {"keywords": ["looker"]}  # t2 was the only job left over
+
+    assert shown(client, upload) == {"t1", "t2"}
+    assert submitted(runner) == ["cv-summary", "refine-1", "check-0"]
+
+
+def test_refining_stops_when_qwen_adds_no_new_keyword(client, upload, runner, store):
+    store(make_job("t1", description="Tableau reporting"), make_job("t2", description="Looker dashboards"))
+    runner.answers["refine-1"] = {"keywords": ["Tableau", "the", "experience"]}  # a repeat and two stop words
+
+    assert shown(client, upload) == {"t1"}
+    assert submitted(runner) == ["cv-summary", "refine-1", "check-0"]  # a second round could not change the search
+
+
+def test_new_keywords_pass_the_stop_list_and_repeats_are_dropped_and_the_old_keywords_stay(
+        client, upload, runner, store):
+    store(make_job("t1", description="Tableau reporting"), make_job("t2", description="Looker dashboards"),
+          make_job("t3", description="Qlik dashboards"))
+    runner.answers["refine-1"] = {"keywords": ["the", "experience", "Tableau", "Looker", "LOOKER",
+                                               "Business Intelligence"]}
+
+    shown(client, upload)
+
+    # Round 2 holds the candidate's keyword first, then the new ones in Qwen's order, once each, spelled as first given.
+    assert prompt_of(runner, "refine-2").endswith("Keywords so far:\ntableau, Looker, Business Intelligence")
+
+
+def test_the_status_says_refining_round_2_during_the_second_round(client, upload, runner, store, hold):
+    store(make_job("t1", description="Tableau reporting"), make_job("t2", description="Looker dashboards"),
+          make_job("t3", description="Qlik dashboards"))
+    runner.answers["refine-1"] = {"keywords": ["looker"]}
+    arrived, release = hold("refine-2")
+
+    base = start(client, upload)
+
+    assert arrived.wait(5)
+    assert client.get(f"{base}/status").json() == {"stage": "refining round 2"}
+    release.set()
+    assert wait_until_finished(client, base) == {"stage": "done"}
+
+
 def checked_ids(runner):
     """The job ids in the last submission, in prompt order. Each test ad ends with its own job id."""
     return [item["prompt"].split()[-1] for item in runner.submissions[-1]]
