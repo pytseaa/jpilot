@@ -23,7 +23,8 @@ def tokens(text):
 def find_qualifying(conn, keywords, employment_types, earlier=frozenset()):
     """The jobs that pass the hard filters and match a keyword, best first, at most RESULT_LIMIT.
 
-    Jobs whose id is in `earlier`, found in a previous round, come before every other job."""
+    When more than RESULT_LIMIT jobs qualify, jobs whose id is in `earlier`, found in a previous round,
+    come before every other job, so the cut cannot drop them."""
     conn.row_factory = sqlite3.Row
     # shortcut: reads the whole table and rebuilds the BM25 index on every search, fine for about 300 jobs, cache the index when the database grows.
     jobs = [dict(row) for row in conn.execute("SELECT * FROM jobs ORDER BY job_id")]
@@ -36,12 +37,15 @@ def find_qualifying(conn, keywords, employment_types, earlier=frozenset()):
     oldest_open = _oldest_open()
     picked = [(score, job) for job, doc, score in zip(jobs, docs, scores)
               if terms & set(doc) and _passes_hard_filters(job, oldest_open, employment_types)]
-    picked.sort(key=lambda pair: (pair[1]["job_id"] not in earlier, -pair[0], pair[1]["job_id"]))
+    picked.sort(key=lambda pair: (-pair[0], pair[1]["job_id"]))
+    if len(picked) > RESULT_LIMIT:  # only a cut can drop a job, so only then do earlier jobs need the front
+        picked.sort(key=lambda pair: pair[1]["job_id"] not in earlier)  # stable: score order stays within each group
     return [job for _, job in picked[:RESULT_LIMIT]]
 
 
 def count_passing(conn, employment_types):
     """How many jobs pass the hard filters, whether or not they match a keyword."""
+    # shortcut: reads every column of the whole table just to count, fine for about 300 jobs, select only the filter columns when the database grows.
     conn.row_factory = sqlite3.Row
     oldest_open = _oldest_open()
     return sum(_passes_hard_filters(job, oldest_open, employment_types)

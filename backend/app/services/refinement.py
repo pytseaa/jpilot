@@ -34,7 +34,8 @@ def widen(conn, keywords, summary, target_role, employment_types, runner, on_rou
 def _new_keywords(round_number, keywords, summary, target_role, runner):
     """One runner submission. The keywords Qwen adds, or [] when its call or answer is unusable.
 
-    The stop list is applied, and a keyword already listed (in any letter case) is not added again."""
+    The stop list is applied, a keyword already listed (in any letter case) is not added again, and neither is
+    one that matching ignores, such as "IT", which the stop list keeps for the review screen."""
     prompt_id = f"refine-{round_number}"
     prompt = prompts.REFINEMENT.format(cv_summary=summary, target_role=target_role, keywords=", ".join(keywords))
     record = runner([{"id": prompt_id, "required_keys": ["keywords"], "prompt": prompt}])[prompt_id]
@@ -48,7 +49,7 @@ def _new_keywords(round_number, keywords, summary, target_role, runner):
     known = {keyword.lower() for keyword in keywords}
     added = []
     for keyword in stop_words.remove(proposed):
-        if keyword.lower() not in known:
+        if keyword.lower() not in known and retrieval.tokens(keyword):
             known.add(keyword.lower())
             added.append(keyword)
     return added
