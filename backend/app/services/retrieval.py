@@ -31,14 +31,30 @@ def find_qualifying(conn, keywords, employment_types):
     terms = set(tokens(" ".join(keywords)))
     # The scores use the whole database, so a narrow search does not change how a job scores.
     scores = BM25Okapi(docs).get_scores(sorted(terms))
-    # shortcut: counts the 30 days from today, so a frozen snapshot turns Closed 30 days on, take the date from the snapshot for the evaluation.
-    oldest_open = (date.today() - timedelta(days=OPEN_DAYS)).isoformat()
-    # Region is fixed to Hong Kong: only "other" is removed, and "unknown" stays marked Unverified.
+    oldest_open = _oldest_open()
     picked = [(score, job) for job, doc, score in zip(jobs, docs, scores)
-              if terms & set(doc) and job["collected"] >= oldest_open and job["region"] != "other"
-              and _has_picked_type(job, employment_types)]
+              if terms & set(doc) and _passes_hard_filters(job, oldest_open, employment_types)]
     picked.sort(key=lambda pair: (-pair[0], pair[1]["job_id"]))
     return [job for _, job in picked[:RESULT_LIMIT]]
+
+
+def count_passing(conn, employment_types):
+    """How many jobs pass the hard filters, whether or not they match a keyword."""
+    conn.row_factory = sqlite3.Row
+    oldest_open = _oldest_open()
+    return sum(_passes_hard_filters(job, oldest_open, employment_types)
+               for job in conn.execute("SELECT * FROM jobs"))
+
+
+def _oldest_open():
+    # shortcut: counts the 30 days from today, so a frozen snapshot turns Closed 30 days on, take the date from the snapshot for the evaluation.
+    return (date.today() - timedelta(days=OPEN_DAYS)).isoformat()
+
+
+def _passes_hard_filters(job, oldest_open, employment_types):
+    # Region is fixed to Hong Kong: only "other" is removed, and "unknown" stays marked Unverified.
+    return (job["collected"] >= oldest_open and job["region"] != "other"
+            and _has_picked_type(job, employment_types))
 
 
 def _has_picked_type(job, picked):

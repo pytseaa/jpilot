@@ -6,7 +6,14 @@ export type Preferences = {
 export type Reviewed = Preferences & { summary: string; keywords: string[]; target_role: string };
 export type Review = Reviewed & { id: string };
 // null until Search is pressed.
-export type Stage = "searching" | "done" | "failed" | null;
+export type Stage =
+  | "searching"
+  | "refining round 1"
+  | "refining round 2"
+  | "checking jobs"
+  | "done"
+  | "failed"
+  | null;
 /** A reason the CV fits the job. The backend sends it only when both quotes were found in their source. */
 export type Claim = { requirement: string; cv_quote: string; job_quote: string };
 export type ResultJob = {

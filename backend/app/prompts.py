@@ -10,6 +10,18 @@ CV:
 # Added to CV_SUMMARY only when the candidate left the target role empty.
 TARGET_ROLE_KEY = '\n"target_role": the one job title that best fits this CV, such as "data analyst".'
 
+REFINEMENT = """A search of a job database with the keywords below found too few jobs. Reply with one JSON object that has this key:
+"keywords": a list of new search keywords for jobs that fit this CV, each a word or a short phrase. Do not repeat a keyword that is already listed.
+
+CV summary:
+{cv_summary}
+
+Target role:
+{target_role}
+
+Keywords so far:
+{keywords}"""
+
 CHECK = """Judge how well the CV below fits the job ad below, and reply with one JSON object that has these keys:
 "grade": 0 if the CV is not a fit for the job, 1 if it is a plausible fit, 2 if it is a strong fit,
 "claims": a list of reasons the CV fits the job, each an object with the keys "requirement" (the job requirement it meets, a short phrase), "cv_quote" (words copied exactly from the CV) and "job_quote" (words copied exactly from the job ad). Use an empty list if the CV fits nothing in the job.

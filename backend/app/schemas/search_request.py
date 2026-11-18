@@ -24,6 +24,11 @@ class CvSummaryAnswer(BaseModel):
     target_role: str = ""
 
 
+class RefinementAnswer(BaseModel):
+    """What the refinement prompt must get back from Qwen."""
+    keywords: list[str]
+
+
 class Reviewed(BaseModel):
     """The values the candidate reviews and may edit, and the Search endpoint keeps."""
     summary: str

@@ -13,6 +13,7 @@ class SearchRequest:
     employment_types: Sequence[str]
     experience_band: str | None
     industry: str | None
-    stage: str | None = None  # searching, done or failed; None until Search is pressed
+    # searching, refining round 1 or 2, checking jobs, done or failed; None until Search is pressed
+    stage: str | None = None
     jobs: list[dict] = field(default_factory=list)  # the shortlist with its verified claims, once done
     dropped_claims: int = 0
