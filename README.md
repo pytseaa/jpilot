@@ -72,4 +72,6 @@ grades and quote-check outcomes, without CV text, prompts, answers or quote text
 Local TACC prompt and downloaded answer files are removed after each submission. Copies may remain in
 the course's TACC storage; remote cleanup is outside the current implementation.
 
-Browser acceptance and real TACC/Qwen integration have not yet been verified.
+Browser checks passed in Microsoft Edge with the fake backend on 2026-11-21: short and empty results,
+sparse/unreadable CVs, conflicting filters, failed checks and an unreachable service.
+Real TACC/Qwen integration has not yet been verified.

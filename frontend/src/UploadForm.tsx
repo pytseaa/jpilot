@@ -28,7 +28,7 @@ export function UploadForm({ onRead }: { onRead: (review: Review, fileName: stri
   };
 
   const removeFile = () => {
-    chooseFile(null);
+    setFile(null);
     // Clear the input too, or picking the same file again would not fire a change.
     if (fileInput.current) fileInput.current.value = "";
   };
