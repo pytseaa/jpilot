@@ -1,4 +1,12 @@
-"""Tickets 09–11: expectations are recorded in verification/tickets-09-11.md before the run."""
+"""Search outcomes, CV cleanup and request traces.
+
+Expected robustness outcomes:
+- Sparse CV: a verified fit or an explanation, without grade-0 padding.
+- Unreadable CV: reject before calling Qwen and keep a failed trace.
+- Conflicting constraints: an empty list pointing to the form.
+- No suitable jobs: an empty list explaining that no evidenced fit was found.
+- Invalid model output twice: skip only that job and report the skipped count.
+"""
 import json
 from contextlib import closing
 

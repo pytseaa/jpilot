@@ -41,9 +41,8 @@ cd frontend && npm ci && npm run dev    # open http://localhost:5173
 
 `JPILOT_RUNNER` accepts only `tacc` (the default) or `fake`. Any other value stops the app at startup.
 
-Tests: `.venv/Scripts/python.exe -m pytest backend`. Frontend tests: `cd frontend && npm test`.
-Frontend production build (including TypeScript checking): `cd frontend && npm run build`.
-Frontend tests require Node.js 22.13+ on the 22.x line or Node.js 24 LTS; verified here with 22.14.0.
+Tests: `.venv/Scripts/python.exe -m pytest backend`. Frontend typecheck: `cd frontend && npm run typecheck`.
+Frontend tests: `cd frontend && npm test` (Node.js 22.13+ on the 22.x line or Node.js 24 LTS).
 
 ### Fill the job database
 
@@ -60,14 +59,17 @@ Add `--snapshot` to freeze a copy of the database for the evaluation after the r
 
 The JSearch key is read from the `JSEARCH_API_KEY` environment variable and is never written to a file.
 
-### Request outcomes and traces (tickets 09–11)
+### Search results and traces
 
 Failed job checks are skipped individually, with a count shown beside the results. A failed submission
 shows an error with no partial list. Short and empty lists explain why no more verified fits are available.
 After success or failure, the CV text, summary and review values are cleared; a new search needs a new upload.
 
-Each request keeps a JSON trace under `backend/data/traces/`, including failed uploads (identified by the
-`X-Request-ID` response header). Traces contain timings, call/token/retry counts, grades and indexed quote
-verification outcomes, without CV text, prompts, answers or quote text. See
-[the verification record](verification/tickets-09-11.md) for the robustness cases, latency calculation,
-test results and the limitation on CV-bearing copies in TACC storage.
+Request traces are stored under `backend/data/traces/`. They contain timings, call/token/retry counts,
+grades and quote-check outcomes, without CV text, prompts, answers or quote text. Failed uploads return
+`X-Request-ID`. From the backend directory, use `app.trace.latency_summary("data")` to calculate median/P95 latency.
+
+Local TACC prompt and downloaded answer files are removed after each submission. Copies may remain in
+the course's TACC storage; remote cleanup is outside the current implementation.
+
+Browser acceptance and real TACC/Qwen integration have not yet been verified.
