@@ -42,6 +42,7 @@ cd frontend && npm ci && npm run dev    # open http://localhost:5173
 `JPILOT_RUNNER` accepts only `tacc` (the default) or `fake`. Any other value stops the app at startup.
 
 Tests: `.venv/Scripts/python.exe -m pytest backend`. Frontend typecheck: `cd frontend && npm run typecheck`.
+Frontend tests: `cd frontend && npm test` (Node.js 22.13+ on the 22.x line or Node.js 24 LTS).
 
 ### Fill the job database
 
@@ -57,3 +58,20 @@ It prints how many jobs it fetched, stored, found already stored, dropped as mos
 Add `--snapshot` to freeze a copy of the database for the evaluation after the run. It is written to `backend/data/snapshots/jpilot-<date>.db`, and a second snapshot on the same day is refused before any request is made. Without the flag nothing is frozen.
 
 The JSearch key is read from the `JSEARCH_API_KEY` environment variable and is never written to a file.
+
+### Search results and traces
+
+Failed job checks are skipped individually, with a count shown beside the results. A failed submission
+shows an error with no partial list. Short and empty lists explain why no more verified fits are available.
+After success or failure, the CV text, summary and review values are cleared; a new search needs a new upload.
+
+Request traces are stored under `backend/data/traces/`. They contain timings, call/token/retry counts,
+grades and quote-check outcomes, without CV text, prompts, answers or quote text. Failed uploads return
+`X-Request-ID`. From the backend directory, use `app.trace.latency_summary("data")` to calculate median/P95 latency.
+
+Local TACC prompt and downloaded answer files are removed after each submission. Copies may remain in
+the course's TACC storage; remote cleanup is outside the current implementation.
+
+Browser checks passed in Microsoft Edge with the fake backend on 2026-11-21: short and empty results,
+sparse/unreadable CVs, conflicting filters, failed checks and an unreachable service.
+Real TACC/Qwen integration has not yet been verified.

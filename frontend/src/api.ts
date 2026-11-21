@@ -28,7 +28,13 @@ export type ResultJob = {
   grade: 1 | 2;
   claims: Claim[];
 };
-export type Results = { jobs: ResultJob[]; dropped_claims: number };
+export type Results = { jobs: ResultJob[]; dropped_claims: number; skipped_jobs: number; explanation: string | null };
+
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+  }
+}
 
 async function call<T>(url: string, init: RequestInit = {}): Promise<T> {
   let res: Response;
@@ -40,7 +46,7 @@ async function call<T>(url: string, init: RequestInit = {}): Promise<T> {
   if (res.ok) return res.json();
   const body = await res.json().catch(() => null);
   // The backend sends a sentence for its own errors, and a list for a bad form value.
-  throw new Error(typeof body?.detail === "string" ? body.detail : "Please check the form and try again.");
+  throw new ApiError(typeof body?.detail === "string" ? body.detail : "Please check the form and try again.", res.status);
 }
 
 export function createRequest(cv: File, targetRole: string, prefs: Preferences): Promise<Review> {
@@ -62,7 +68,7 @@ export function startSearch(id: string, reviewed: Reviewed): Promise<Review> {
   });
 }
 
-export function getStage(id: string): Promise<{ stage: Stage }> {
+export function getStage(id: string): Promise<{ stage: Stage; error?: string }> {
   return call(`/api/search-requests/${id}/status`);
 }
 

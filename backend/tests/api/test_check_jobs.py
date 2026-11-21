@@ -444,6 +444,8 @@ def test_a_job_whose_check_is_unusable_is_skipped_and_the_others_still_show(
 def test_no_check_is_submitted_when_no_job_qualifies(client, upload, runner):
     results = run(client, upload, keywords=["zzzz"])
 
-    assert results == {"jobs": [], "dropped_claims": 0}
+    assert results["jobs"] == []
+    assert results["dropped_claims"] == results["skipped_jobs"] == 0
+    assert "keywords" in results["explanation"]
     # The fixture jobs pass the hard filters without matching, so a refinement round runs and adds nothing.
     assert [submission[0]["id"] for submission in runner.submissions] == ["cv-summary", "refine-1"]

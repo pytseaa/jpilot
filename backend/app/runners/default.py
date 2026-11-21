@@ -9,7 +9,7 @@ def default_runner():
     # quietly run the canned answers while the user believes they are on TACC.
     setting = os.environ.get("JPILOT_RUNNER", "tacc")
     if setting == "fake":
-        return FakeRunner()
+        return FakeRunner(retain_prompts=False)
     if setting == "tacc":
         return TaccRunner()
     raise ValueError(f"JPILOT_RUNNER must be 'fake' or 'tacc', not {setting!r}")

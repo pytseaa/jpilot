@@ -42,6 +42,9 @@ class FakeTcloud:
     def will_not_write_answer_file(self):
         (self.home / "no-answer-file").write_text("", encoding="utf-8")
 
+    def will_fail_download_after_copy(self):
+        (self.home / "download-fails").write_text("", encoding="utf-8")
+
     def calls(self):
         text = (self.home / "calls.jsonl").read_text(encoding="utf-8")
         return [json.loads(line) for line in text.splitlines()]
@@ -108,7 +111,7 @@ def download(home, remote, local):
         say(f"Error: {remote} not found", sys.stderr)
         return 1
     shutil.copyfile(source, local)
-    return 0
+    return 1 if (home / "download-fails").exists() else 0
 
 
 def main(args):

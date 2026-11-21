@@ -8,6 +8,7 @@ from app.schemas.check import Claim
 class Status(BaseModel):
     """Where a search is: searching, refining round 1 or 2, checking jobs, done or failed. None until the candidate presses Search."""
     stage: str | None
+    error: str | None = None
 
 
 class ResultJob(BaseModel):
@@ -27,3 +28,5 @@ class ResultJob(BaseModel):
 class Results(BaseModel):
     jobs: list[ResultJob]
     dropped_claims: int  # claims whose quote was not found, counted apart from the shown ones
+    skipped_jobs: int = 0
+    explanation: str | None = None
