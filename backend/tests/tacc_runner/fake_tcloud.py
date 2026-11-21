@@ -45,6 +45,14 @@ class FakeTcloud:
     def will_fail_download_after_copy(self):
         (self.home / "download-fails").write_text("", encoding="utf-8")
 
+    def will_grow_log(self, snapshots):
+        """Make each `cat` of the running log return the next snapshot, then repeat the last."""
+        (self.home / "log-script").write_text(json.dumps(snapshots), encoding="utf-8")
+
+    def will_log(self, text):
+        """Make `cat` of the running log always return this text."""
+        (self.home / "running-log").write_text(text, encoding="utf-8")
+
     def calls(self):
         text = (self.home / "calls.jsonl").read_text(encoding="utf-8")
         return [json.loads(line) for line in text.splitlines()]
@@ -114,6 +122,29 @@ def download(home, remote, local):
     return 1 if (home / "download-fails").exists() else 0
 
 
+def cat(home, path):
+    # A log script lets a test return a growing log across polls (one snapshot per cat call).
+    script_path = home / "log-script"
+    if script_path.exists():
+        snapshots = json.loads(script_path.read_text(encoding="utf-8"))
+        counter = home / "cat-count"
+        n = int(counter.read_text(encoding="utf-8")) if counter.exists() else 0
+        counter.write_text(str(n + 1), encoding="utf-8")
+        if n < len(snapshots):
+            say(snapshots[n], sys.stdout)
+            return 0
+        if snapshots:  # after the script runs out, repeat the last snapshot
+            say(snapshots[-1], sys.stdout)
+            return 0
+    # A static running log file, for tests that do not need it to grow.
+    log_path = home / "running-log"
+    if log_path.exists():
+        say(log_path.read_text(encoding="utf-8"), sys.stdout)
+        return 0
+    say(f"Error: {path} not found", sys.stderr)
+    return 1
+
+
 def main(args):
     home = Path(os.environ["FAKE_TCLOUD_HOME"])
     with open(home / "calls.jsonl", "a", encoding="utf-8") as calls:
@@ -124,6 +155,8 @@ def main(args):
         return ps(home, args[2])
     if args[:1] == ["download"]:
         return download(home, args[1], args[2])
+    if args[:1] == ["cat"]:
+        return cat(home, args[1])
     say(f"Error: unknown command {args}", sys.stderr)
     return 2
 

@@ -9,6 +9,8 @@ class Status(BaseModel):
     """Where a search is: searching, refining round 1 or 2, checking jobs, done or failed. None until the candidate presses Search."""
     stage: str | None
     error: str | None = None
+    # "8 of 20" when the running log can be read during checking; None when it cannot, or outside checking.
+    checked: str | None = None
 
 
 class ResultJob(BaseModel):

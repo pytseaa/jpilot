@@ -15,6 +15,8 @@ class SearchRequest:
     industry: str | None
     # searching, refining round 1 or 2, checking jobs, done or failed; None until Search is pressed
     stage: str | None = None
+    # "8 of 20" while the TACC client checks jobs and the running log can be read; None otherwise
+    checked: str | None = None
     jobs: list[dict] = field(default_factory=list)  # the shortlist with its verified claims, once done
     dropped_claims: int = 0
     skipped_jobs: int = 0
