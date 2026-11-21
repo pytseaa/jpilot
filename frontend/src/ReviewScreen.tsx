@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { getResults, getStage, type Results, type Review, type Reviewed, startSearch, type Stage } from "./api";
+import { useCallback, useEffect, useState } from "react";
+import { ApiError, getResults, getStage, type Results, type Review, type Reviewed, startSearch, type Stage } from "./api";
 import { JobList } from "./JobList";
 import { BandAndIndustry, EmploymentPills, NO_EMPLOYMENT_TYPE } from "./PreferenceFields";
 
@@ -23,10 +23,20 @@ export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props)
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<Stage>(null);
   const [results, setResults] = useState<Results | null>(null);
+  const [resultsAttempt, setResultsAttempt] = useState(0);
+  const [loadingResults, setLoadingResults] = useState(false);
   const searching = stage !== null && stage in RUNNING_TEXT;
   const finished = stage === "done" || stage === "failed";
 
   const update = (patch: Partial<Reviewed>) => setValues({ ...values, ...patch });
+
+  const finish = useCallback((next: "done" | "failed", message = "") => {
+    setValues({ summary: "", keywords: [], target_role: "", employment_types: [], experience_band: null, industry: null });
+    setNewKeyword("");
+    onFinished(id);
+    setError(message);
+    setStage(next);
+  }, [id, onFinished]);
 
   useEffect(() => {
     if (!searching) return;
@@ -37,25 +47,45 @@ export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props)
       polling = true;
       try {
         const { stage: next, error: failure } = await getStage(id);
-        const nextResults = next === "done" ? await getResults(id) : null;
         if (cancelled) return;
         if (next === "done" || next === "failed") {
-          setValues({ summary: "", keywords: [], target_role: "", employment_types: [], experience_band: null, industry: null });
-          setNewKeyword("");
-          onFinished(id);
+          finish(next, next === "failed" ? failure || "The search failed. Please upload your CV again to retry." : "");
+        } else {
+          setError(next === null ? "The search has not started. Please try again." : "");
+          setStage(next);
         }
-        if (nextResults) setResults(nextResults);
-        setError(next === "failed" ? failure || "The search failed. Please upload your CV again to retry." : "");
-        setStage(next);
       } catch (err) {
         // The backend may still be searching, so keep the stage and poll again instead of giving up.
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (cancelled) return;
+        if (err instanceof ApiError && [404, 410].includes(err.status)) {
+          finish("failed", "This search is no longer available. Please upload your CV again.");
+        } else {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
         polling = false;
       }
     }, POLL_MS);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [searching, id, onFinished]);
+  }, [searching, id, finish]);
+
+  useEffect(() => {
+    if (stage !== "done") return;
+    let cancelled = false;
+    setLoadingResults(true);
+    setError("");
+    getResults(id).then((loaded) => {
+      if (!cancelled) setResults(loaded);
+    }).catch((err: unknown) => {
+      if (cancelled) return;
+      if (err instanceof ApiError && [404, 410].includes(err.status)) {
+        finish("failed", "These results are no longer available. Please upload your CV again.");
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }).finally(() => { if (!cancelled) setLoadingResults(false); });
+    return () => { cancelled = true; };
+  }, [stage, id, resultsAttempt, finish]);
 
   const addKeyword = () => {
     const keyword = newKeyword.trim();
@@ -76,7 +106,13 @@ export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props)
       setResults(null); // only once the backend accepted the start, so a refusal keeps the old list
       setStage("searching");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof ApiError && [404, 410, 503].includes(err.status)) finish("failed", message);
+      else {
+        setError(message);
+        // A lost response does not tell us whether the backend accepted the search.
+        if (!(err instanceof ApiError) || err.status >= 500) setStage("searching");
+      }
     } finally {
       setBusy(false);
     }
@@ -148,6 +184,8 @@ export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props)
       {error && <p role="alert" className="error">{error}</p>}
       {stage && searching && <p role="status" className="note">{RUNNING_TEXT[stage]}</p>}
       {finished && <p className="note">Your CV and summary have been deleted. Upload your CV again for a new search.</p>}
+      {loadingResults && stage === "done" && <p role="status" className="note">Loading results...</p>}
+      {stage === "done" && !results && !loadingResults && <button type="button" onClick={() => setResultsAttempt((attempt) => attempt + 1)}>Load results again</button>}
       {results && <JobList results={results} />}
       <div className="actions">
         <button type="button" className="secondary" onClick={onRestart}>

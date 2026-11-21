@@ -8,7 +8,8 @@ from pathlib import Path
 from app.runners.tacc import SERVICE_MESSAGE, SubmissionFailed
 
 ERROR_TYPES = {"http_error", "timeout", "unreachable", "bad_response", "invalid_json",
-               "missing_key", "client_error", "invalid_answer", "submission_failed"}
+               "missing_key", "client_error", "invalid_answer", "submission_failed",
+               "download_failed", "incomplete_answers", "command_unavailable"}
 
 
 def error_type(value):
@@ -69,7 +70,8 @@ class RequestTrace:
         self._end_stage()
         self.data.update(outcome=outcome, finished_at=_now())
         calls = [call for submission in self.data["submissions"] for call in submission["calls"]]
-        self.data["totals"] = {"calls": len(calls), **{
+        self.data["totals"] = {"scheduled_calls": len(calls),
+                               "calls": sum(c["status"] != "not_returned" for c in calls), **{
             name: sum(call[name] for call in calls)
             for name in ("attempts", "retries", "prompt_tokens", "completion_tokens")}}
         if failure:
@@ -86,14 +88,17 @@ class RequestTrace:
                 records = runner(prompts)
                 if (not isinstance(records, dict)
                         or any(not isinstance(records.get(p["id"]), dict)
-                               or records[p["id"]].get("status") not in ("ok", "failed") for p in prompts)):
-                    raise SubmissionFailed("The submission returned an incomplete answer file.")
-                if records and all(r.get("error_type") == "unreachable" for r in records.values()):
+                               or records[p["id"]].get("status") not in ("ok", "failed")
+                               or (records[p["id"]]["status"] == "ok" and "answer" not in records[p["id"]])
+                               for p in prompts)):
+                    raise SubmissionFailed("The submission returned an incomplete answer file.", error_type="incomplete_answers")
+                if prompts and all(records[p["id"]].get("error_type") == "unreachable" for p in prompts):
                     raise SubmissionFailed(SERVICE_MESSAGE, records=records)
                 entry["status"] = "ok"
                 return records
             except Exception as exc:
-                entry.update(status="failed", error_type="submission_failed")
+                entry.update(status="failed", error_type=error_type(
+                    exc.error_type if isinstance(exc, SubmissionFailed) else "client_error"))
                 records = getattr(exc, "records", None) or records
                 raise
             finally:

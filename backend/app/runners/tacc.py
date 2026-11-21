@@ -21,9 +21,10 @@ SERVICE_MESSAGE = ("The Qwen service could not be reached. Please restart the se
 class SubmissionFailed(Exception):
     """The TACC submission did not run. The message is for the candidate."""
 
-    def __init__(self, message, records=None):
+    def __init__(self, message, records=None, error_type="submission_failed"):
         super().__init__(message)
         self.records = records
+        self.error_type = "unreachable" if message == SERVICE_MESSAGE else error_type
 
 
 class TaccRunner:
@@ -49,24 +50,29 @@ class TaccRunner:
             code, output = self._run("submit", cwd=self.client_dir)
             found = JOB_NUMBER.search(output)
             if code != 0 or found is None:
-                raise SubmissionFailed(SERVICE_MESSAGE)
+                raise SubmissionFailed("The TACC submission failed. Please check the TACC submission status and try again.")
             job = found.group(1)
             # tcloud reports an error for a job that has finished, so an error means "done".
             while self._run("ps", "-j", job)[0] == 0:
                 if time.monotonic() >= deadline:
-                    raise SubmissionFailed("The TACC submission timed out.")
+                    raise SubmissionFailed("The TACC submission timed out.", error_type="timeout")
                 time.sleep(self.poll_seconds)
             with tempfile.TemporaryDirectory() as tmp:
                 answers = Path(tmp) / "answers.json"
-                self._run("download", f"jpilot-tacc-client/job-{job}.json", str(answers))
+                code, _ = self._run("download", f"jpilot-tacc-client/job-{job}.json", str(answers))
+                if code != 0:
+                    raise SubmissionFailed("The TACC answers could not be downloaded. Please try again.", error_type="download_failed")
                 try:
                     records = json.loads(answers.read_text(encoding="utf-8"))["answers"]
                     if (not isinstance(records, dict)
                             or any(not isinstance(records.get(p["id"]), dict)
-                                   or records[p["id"]].get("status") not in ("ok", "failed") for p in prompts)):
+                                   or records[p["id"]].get("status") not in ("ok", "failed")
+                                   or (records[p["id"]]["status"] == "ok" and "answer" not in records[p["id"]])
+                                   for p in prompts)):
                         raise ValueError("incomplete answer file")
-                except (OSError, ValueError, KeyError, TypeError) as exc:  # no file, or not the shape we wrote
-                    raise SubmissionFailed(SERVICE_MESSAGE) from exc
+                except (OSError, ValueError, KeyError, TypeError):  # no file, or not the shape we wrote
+                    raise SubmissionFailed("The TACC submission returned an incomplete answer file. Please try again.",
+                                           error_type="incomplete_answers") from None
             # Only the Qwen service is down when no call got through; one bad call is not that.
             if records and all(r.get("error_type") == "unreachable" for r in records.values()):
                 raise SubmissionFailed(SERVICE_MESSAGE, records=records)
@@ -80,7 +86,8 @@ class TaccRunner:
             done = subprocess.run([*self.tcloud, *args], cwd=cwd, capture_output=True,
                                   timeout=self.command_timeout)
         except subprocess.TimeoutExpired:
-            raise SubmissionFailed("The TACC command timed out.") from None
-        except OSError as exc:
-            raise SubmissionFailed(SERVICE_MESSAGE) from exc
+            raise SubmissionFailed("The TACC command timed out.", error_type="timeout") from None
+        except OSError:
+            raise SubmissionFailed("The tcloud command could not be started. Check that tcloud is installed and configured.",
+                                   error_type="command_unavailable") from None
         return done.returncode, (done.stdout + done.stderr).replace(b"\0", b"").decode(errors="replace")

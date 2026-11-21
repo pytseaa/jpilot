@@ -12,7 +12,7 @@ export function JobList({ results }: { results: Results }) {
   return (
     <section>
       {jobs.length === 0 ? (
-        <p role="status" className="note">Done. No job had a fit with quotes we could check.</p>
+        <p role="status" className="note">Done. No jobs to show.</p>
       ) : (
         <p role="status" className="note">
           Done. {jobs.length} {jobs.length === 1 ? "job fits" : "jobs fit"} your CV, strongest fit first.

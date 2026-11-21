@@ -41,7 +41,9 @@ cd frontend && npm ci && npm run dev    # open http://localhost:5173
 
 `JPILOT_RUNNER` accepts only `tacc` (the default) or `fake`. Any other value stops the app at startup.
 
-Tests: `.venv/Scripts/python.exe -m pytest backend`. Frontend typecheck: `cd frontend && npm run typecheck`.
+Tests: `.venv/Scripts/python.exe -m pytest backend`. Frontend tests: `cd frontend && npm test`.
+Frontend production build (including TypeScript checking): `cd frontend && npm run build`.
+Frontend tests require Node.js 22.13+ on the 22.x line or Node.js 24 LTS; verified here with 22.14.0.
 
 ### Fill the job database
 

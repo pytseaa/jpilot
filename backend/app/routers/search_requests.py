@@ -24,6 +24,34 @@ def _review(stored):
     return Review.model_validate(vars(stored))  # cv_text is not a Review field, so it is left out
 
 
+def _finish_trace(trace, outcome, failure=None):
+    if trace is None:
+        return
+    try:
+        trace.finish(outcome, failure)
+    except Exception:
+        # Storage errors must never bypass CV cleanup or leak exception text in a worker traceback.
+        logger.error("Trace could not be written for request %s", trace.data["request_id"])
+
+
+def _fail_search(stored, exc):
+    failure = exc.error_type if isinstance(exc, SubmissionFailed) else "client_error"
+    stored.jobs = []
+    stored.forget_cv()
+    if failure == "unreachable":
+        stored.error = SERVICE_MESSAGE
+    elif failure == "timeout":
+        stored.error = "The TACC submission timed out. No partial results are shown."
+    elif isinstance(exc, SubmissionFailed):
+        stored.error = "The TACC submission failed. No partial results are shown."
+    else:
+        stored.error = "The search failed. No partial results are shown."
+    stored.error += " Your CV has been deleted. Please upload it again to retry."
+    logger.error("Request %s failed", stored.id)
+    _finish_trace(stored.trace, "failed", failure)
+    stored.stage = "failed"
+
+
 @router.post("")
 def create(
     request: Request,
@@ -36,25 +64,31 @@ def create(
 ) -> Review:
     """Read the CV and return its summary for the review screen."""
     request_id = uuid4().hex
-    trace = RequestTrace(request.app.state.data_dir, request_id)
+    trace = None
     headers = {"X-Request-ID": request_id}
     response.headers.update(headers)
     target_role = target_role.strip()
     try:
+        trace = RequestTrace(request.app.state.data_dir, request_id)
         cv_text = cv_intake.extract_text(cv.file.read())
         answer = cv_intake.summarise(cv_text, trace.runner(request.app.state.runner), not target_role)
+        trace.review()
     except cv_intake.CvRejected as exc:
-        trace.finish("failed", "invalid_answer")
+        _finish_trace(trace, "failed", "invalid_answer")
         raise HTTPException(422, str(exc), headers=headers) from None
     except cv_intake.SummaryFailed:
-        trace.finish("failed", "invalid_answer")
+        _finish_trace(trace, "failed", "invalid_answer")
         raise HTTPException(502, "The CV could not be matched because no usable CV summary was returned. "
                             "Please upload your CV again to retry.", headers=headers) from None
     except SubmissionFailed as exc:
-        trace.finish("failed", "submission_failed")
+        _finish_trace(trace, "failed", exc.error_type)
         raise HTTPException(502, str(exc), headers=headers) from None
+    except OSError:
+        _finish_trace(trace, "failed", "client_error")
+        raise HTTPException(503, "The request could not be stored. Please check backend storage and upload your CV again.",
+                            headers=headers) from None
     except Exception:
-        trace.finish("failed", "client_error")
+        _finish_trace(trace, "failed", "client_error")
         raise HTTPException(502, "The CV could not be read. Please upload your CV again.", headers=headers) from None
     finally:
         cv.file.close()
@@ -62,7 +96,6 @@ def create(
                            target_role or answer.target_role.strip(),
                            employment_types, experience_band, industry)
     stored.trace = trace
-    trace.review()
     request.app.state.requests[stored.id] = stored
     return _review(stored)
 
@@ -94,17 +127,7 @@ def _run_search(data_dir, runner, stored):
         stored.trace.finish("done")
         stored.stage = "done"
     except Exception as exc:  # never log exception text: a library error may include prompt or answer text
-        failure = "submission_failed" if isinstance(exc, SubmissionFailed) else "client_error"
-        stored.jobs = []
-        stored.forget_cv()
-        stored.error = ((SERVICE_MESSAGE if str(exc) == SERVICE_MESSAGE else "The TACC submission failed. No partial results are shown.")
-                        if isinstance(exc, SubmissionFailed) else "The search failed. No partial results are shown.")
-        stored.error += " Your CV has been deleted. Please upload it again to retry."
-        logger.error("Request %s failed (%s)", stored.id, failure)
-        try:
-            stored.trace.finish("failed", failure)
-        finally:
-            stored.stage = "failed"
+        _fail_search(stored, exc)
 
 
 @router.post("/{request_id}/search")
@@ -120,16 +143,20 @@ def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
         stored.stage = "searching"
         vars(stored).update(reviewed.model_dump())
         review = _review(stored)  # snapshot before the worker can delete the CV summary
-        stored.trace.stage("searching")
-        Thread(target=_run_search, args=(request.app.state.data_dir, request.app.state.runner, stored),
-               daemon=True).start()
+        try:
+            stored.trace.stage("searching")
+            Thread(target=_run_search, args=(request.app.state.data_dir, request.app.state.runner, stored),
+                   daemon=True).start()
+        except Exception as exc:
+            _fail_search(stored, exc)
+            raise HTTPException(503, stored.error) from None
     return review
 
 
-@router.get("/{request_id}/status", response_model_exclude_none=True)
+@router.get("/{request_id}/status", response_model_exclude_unset=True)
 def status(request: Request, request_id: str) -> Status:
     stored = _stored(request, request_id)
-    return Status(stage=stored.stage, error=stored.error)
+    return Status(stage=stored.stage, error=stored.error) if stored.error else Status(stage=stored.stage)
 
 
 @router.get("/{request_id}/results")

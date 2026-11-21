@@ -235,3 +235,76 @@ def test_all_failed_checks_have_an_honest_explanation(client, upload, runner):
     result = client.get(f"{base}/results").json()
     assert result["skipped_jobs"] == 1 and result["jobs"] == []
     assert "No jobs could be checked" in result["explanation"]
+
+
+@pytest.mark.parametrize("failure", ["worker_start", "trace_start", "trace_during_search"])
+def test_infrastructure_failures_never_keep_cv_or_block_a_later_search(client, upload, monkeypatch, failure, caplog):
+    from app.routers import search_requests
+    from app.trace import RequestTrace
+
+    review = upload(text_pdf(f"SQL {MARKER}")).json()
+    base = f"/api/search-requests/{review['id']}"
+    with monkeypatch.context() as broken:
+        if failure == "worker_start":
+            class BrokenThread:
+                def __init__(self, **kwargs):
+                    pass
+
+                def start(self):
+                    raise RuntimeError(MARKER)
+            broken.setattr(search_requests, "Thread", BrokenThread)
+        else:
+            original = RequestTrace.save
+
+            def save(trace):
+                target = "searching" if failure == "trace_start" else "checking jobs"
+                if trace.data["stages"][-1]["name"] == target:
+                    raise OSError(MARKER)
+                return original(trace)
+            broken.setattr(RequestTrace, "save", save)
+        response = client.post(f"{base}/search", json=review)
+        assert response.status_code in (200, 503)
+        assert wait_until_finished(client, base)["stage"] == "failed"
+        stored = client.app.state.requests[review["id"]]
+        assert stored.cv_text == stored.summary == ""
+        assert stored.jobs == []
+        assert client.post(f"{base}/search", json=review).status_code == 410
+    assert MARKER not in caplog.text
+    base, _ = start(client, upload)
+    assert wait_until_finished(client, base)["stage"] == "done"
+
+
+def test_status_before_search_explicitly_returns_a_null_stage(client, upload):
+    review = upload(text_pdf("SQL reports")).json()
+    assert client.get(f"/api/search-requests/{review['id']}/status").json() == {"stage": None}
+
+
+def test_upload_storage_failure_has_a_safe_error_and_keeps_no_request(client, upload, monkeypatch, caplog):
+    from app.trace import RequestTrace
+
+    def fail(trace):
+        raise OSError(MARKER)
+    monkeypatch.setattr(RequestTrace, "save", fail)
+    response = upload(text_pdf(f"SQL {MARKER}"))
+    assert response.status_code == 503
+    assert "storage" in response.json()["detail"]
+    assert "X-Request-ID" in response.headers
+    assert client.app.state.requests == {}
+    assert MARKER not in response.text + caplog.text
+
+
+def test_failed_submission_does_not_count_scheduled_prompts_as_returned_calls(client, upload, monkeypatch):
+    store(client, make_job("a", description="SQL reports"))
+    original = FakeRunner.__call__
+
+    def submit(self, prompts):
+        if prompts[0]["id"].startswith("check-"):
+            raise SubmissionFailed("submission failed")
+        return original(self, prompts)
+    monkeypatch.setattr(FakeRunner, "__call__", submit)
+    base, review = start(client, upload)
+    assert wait_until_finished(client, base)["stage"] == "failed"
+    totals = trace_for(client, review["id"])["totals"]
+    assert totals["scheduled_calls"] == 2
+    assert totals["calls"] == 1
+    assert totals["attempts"] == 1
