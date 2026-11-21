@@ -3,11 +3,11 @@ import re
 
 from pydantic import ValidationError
 
-from app import prompts
-from app.schemas.check import CheckAnswer, Claim
+from app import learning_links, prompts
+from app.schemas.check import CheckAnswer, Claim, UnmetRequirement
 from app.services import ranking
 
-CHECK_KEYS = ["grade", "claims"]
+CHECK_KEYS = ["grade", "claims"]  # unmet_requirements is optional: a missing field degrades to empty skill gaps
 SHORTLIST_SIZE = 5
 
 
@@ -17,9 +17,11 @@ def check_jobs(jobs, cv_text, summary, runner, experience_band, industry, trace=
     The preferences only order the shortlist, so they never reach a prompt."""
     if not jobs:
         return [], 0, 0
+    links_text = _learning_links_text()
     submission = [{"id": f"check-{i}", "required_keys": CHECK_KEYS,
                    "prompt": prompts.CHECK.format(cv_summary=summary, cv_text=cv_text,
-                                                  description=job["description"])}
+                                                  description=job["description"],
+                                                  learning_links=links_text)}
                   for i, job in enumerate(jobs)]
     records = runner(submission)
     checked, dropped, skipped = [], 0, 0
@@ -36,7 +38,9 @@ def check_jobs(jobs, cv_text, summary, runner, experience_band, industry, trace=
             trace.job(job["job_id"], answer.grade, decisions)
         dropped += not_found
         if answer.grade > 0 and verified:
-            checked.append({**job, "grade": answer.grade, "claims": [c.model_dump() for c in verified]})
+            checked.append({**job, "grade": answer.grade,
+                            "claims": [c.model_dump() for c in verified],
+                            "skill_gaps": _skill_gaps(answer.unmet_requirements)})
     return ranking.rank(checked, experience_band, industry)[:SHORTLIST_SIZE], dropped, skipped
 
 
@@ -70,6 +74,33 @@ def _verified(raw_claims, cv_text, description):
         else:
             dropped += 1
     return verified, dropped, decisions
+
+
+def _skill_gaps(raw_unmet):
+    """Skill gaps from the unmet requirements, dropping any link id not in the curated list.
+
+    A requirement with no surviving link is still shown as a skill gap, just without a link.
+    A made-up URL never reaches the candidate, because only ids in the curated list resolve."""
+    gaps = []
+    for raw in raw_unmet:
+        try:
+            unmet = UnmetRequirement.model_validate(raw)
+        except ValidationError:
+            continue
+        links = []
+        for raw_id in unmet.link_ids:
+            if not isinstance(raw_id, str):
+                continue
+            link = learning_links.BY_ID.get(raw_id)
+            if link is not None:
+                links.append({"id": link["id"], "title": link["title"], "url": link["url"]})
+        gaps.append({"requirement": unmet.requirement, "learning_links": links})
+    return gaps
+
+
+def _learning_links_text():
+    """The id and title of every curated link, for the check prompt. Never a URL."""
+    return "\n".join(f"{link['id']}: {link['title']}" for link in learning_links.LEARNING_LINKS)
 
 
 def _found(quote, source):

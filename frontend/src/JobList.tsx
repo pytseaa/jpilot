@@ -50,6 +50,27 @@ export function JobList({ results }: { results: Results }) {
                   <blockquote><span className="source">The ad</span> &ldquo;{claim.job_quote}&rdquo;</blockquote>
                 </div>
               ))}
+              {job.skill_gaps.length > 0 && (
+                <div className="skill-gaps">
+                  <p className="note">Skills this job asks for that your CV does not show:</p>
+                  <ul>
+                    {job.skill_gaps.map((gap, i) => (
+                      <li key={i}>
+                        <strong>{gap.requirement}</strong>
+                        {gap.learning_links.length > 0 && (
+                          <ul className="learning-links">
+                            {gap.learning_links.map((link) => (
+                              <li key={link.id}>
+                                <a href={link.url} target="_blank" rel="noreferrer">{link.title}</a>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <p className="note">Check the ad before you apply: the job may have closed.</p>
             </li>
           );

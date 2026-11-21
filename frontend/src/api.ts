@@ -16,6 +16,10 @@ export type Stage =
   | null;
 /** A reason the CV fits the job. The backend sends it only when both quotes were found in their source. */
 export type Claim = { requirement: string; cv_quote: string; job_quote: string };
+/** A curated learning link the team has checked by hand. The URL never comes from Qwen. */
+export type LearningLink = { id: string; title: string; url: string };
+/** A job requirement the CV does not meet, with any learning links that fit it. */
+export type SkillGap = { requirement: string; learning_links: LearningLink[] };
 export type ResultJob = {
   job_id: string;
   title: string | null;
@@ -27,6 +31,7 @@ export type ResultJob = {
   unverified: boolean;
   grade: 1 | 2;
   claims: Claim[];
+  skill_gaps: SkillGap[];
 };
 export type Results = { jobs: ResultJob[]; dropped_claims: number; skipped_jobs: number; explanation: string | null };
 
