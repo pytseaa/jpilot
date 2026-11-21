@@ -1,4 +1,5 @@
 from pdfs import text_pdf
+from searches import wait_until_finished
 
 MARKER = "ZQX-MARKER-7431"
 
@@ -13,6 +14,7 @@ def test_cv_text_and_summary_never_reach_a_file(upload, client, runner, tmp_path
 
     review = upload(text_pdf(f"Analyst {MARKER} at a retail bank")).json()
     client.post(f"/api/search-requests/{review['id']}/search", json=review)
+    assert wait_until_finished(client, f"/api/search-requests/{review['id']}")["stage"] == "done"
 
     # The marker did travel through the app, and the scan did look at the database.
     assert MARKER in runner.submissions[0][0]["prompt"]

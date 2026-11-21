@@ -28,7 +28,7 @@ export type ResultJob = {
   grade: 1 | 2;
   claims: Claim[];
 };
-export type Results = { jobs: ResultJob[]; dropped_claims: number };
+export type Results = { jobs: ResultJob[]; dropped_claims: number; skipped_jobs: number; explanation: string | null };
 
 async function call<T>(url: string, init: RequestInit = {}): Promise<T> {
   let res: Response;
@@ -62,7 +62,7 @@ export function startSearch(id: string, reviewed: Reviewed): Promise<Review> {
   });
 }
 
-export function getStage(id: string): Promise<{ stage: Stage }> {
+export function getStage(id: string): Promise<{ stage: Stage; error?: string }> {
   return call(`/api/search-requests/${id}/status`);
 }
 

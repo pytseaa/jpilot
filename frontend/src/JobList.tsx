@@ -8,7 +8,7 @@ const GRADE_LABEL = { 1: "Plausible fit", 2: "Strong fit" };
 
 /** The shortlist: up to five jobs the backend graded 1 or 2, each with the claims whose quotes it found. */
 export function JobList({ results }: { results: Results }) {
-  const { jobs, dropped_claims } = results;
+  const { jobs, dropped_claims, skipped_jobs, explanation } = results;
   return (
     <section>
       {jobs.length === 0 ? (
@@ -16,6 +16,13 @@ export function JobList({ results }: { results: Results }) {
       ) : (
         <p role="status" className="note">
           Done. {jobs.length} {jobs.length === 1 ? "job fits" : "jobs fit"} your CV, strongest fit first.
+        </p>
+      )}
+      {explanation && <p role="status" className="note">{explanation}</p>}
+      {skipped_jobs > 0 && (
+        <p role="status" className="note">
+          {skipped_jobs} {skipped_jobs === 1 ? "job was" : "jobs were"} skipped because the check failed.
+          The results may be incomplete.
         </p>
       )}
       <ol className="jobs">

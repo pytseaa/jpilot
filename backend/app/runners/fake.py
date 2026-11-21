@@ -13,12 +13,14 @@ DEMO_ANSWERS = {
 class FakeRunner:
     """Takes the prompt list a submission would hold; returns records like the answer file's."""
 
-    def __init__(self, answers=None):
+    def __init__(self, answers=None, retain_prompts=True):
         self.answers = DEMO_ANSWERS if answers is None else answers
         self.submissions = []
+        self.retain_prompts = retain_prompts
 
     def __call__(self, prompts):
-        self.submissions.append(prompts)
+        if self.retain_prompts:  # test inspection only; the app's fake mode never retains CV-bearing prompts
+            self.submissions.append(prompts)
         return {item["id"]: self._record(self._answer(item)) for item in prompts}
 
     def _answer(self, item):
@@ -35,8 +37,11 @@ class FakeRunner:
     def _record(answer):
         # An answer of None stands for a call that failed, as the TACC client records it.
         if answer is None:
-            return {"status": "failed", "error_type": "invalid_json"}
-        return {"status": "ok", "answer": answer}
+            return {"status": "failed", "error_type": "invalid_json", "attempts": 2,
+                    "errors": ["invalid_json", "invalid_json"], "prompt_tokens": 0,
+                    "completion_tokens": 0, "elapsed_seconds": 0}
+        return {"status": "ok", "answer": answer, "attempts": 1, "errors": [],
+                "prompt_tokens": 0, "completion_tokens": 0, "elapsed_seconds": 0}
 
 
 def _grade_by_quoting(prompt):

@@ -57,3 +57,15 @@ It prints how many jobs it fetched, stored, found already stored, dropped as mos
 Add `--snapshot` to freeze a copy of the database for the evaluation after the run. It is written to `backend/data/snapshots/jpilot-<date>.db`, and a second snapshot on the same day is refused before any request is made. Without the flag nothing is frozen.
 
 The JSearch key is read from the `JSEARCH_API_KEY` environment variable and is never written to a file.
+
+### Request outcomes and traces (tickets 09–11)
+
+Failed job checks are skipped individually, with a count shown beside the results. A failed submission
+shows an error with no partial list. Short and empty lists explain why no more verified fits are available.
+After success or failure, the CV text, summary and review values are cleared; a new search needs a new upload.
+
+Each request keeps a JSON trace under `backend/data/traces/`, including failed uploads (identified by the
+`X-Request-ID` response header). Traces contain timings, call/token/retry counts, grades and indexed quote
+verification outcomes, without CV text, prompts, answers or quote text. See
+[the verification record](verification/tickets-09-11.md) for the robustness cases, latency calculation,
+test results and the limitation on CV-bearing copies in TACC storage.

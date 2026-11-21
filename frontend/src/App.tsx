@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { Review } from "./api";
 import { ReviewScreen } from "./ReviewScreen";
 import { Sidebar, type Session } from "./Sidebar";
@@ -23,6 +23,13 @@ export function App() {
   // Functional update: this runs after an upload finishes, when `sessions` may have changed.
   const cvRead = (key: string, review: Review, fileName: string) =>
     setSessions((list) => list.map((s) => (s.key === key ? { ...s, review, fileName } : s)));
+
+  const forgetReview = useCallback((requestId: string) => {
+    setSessions((list) => list.map((s) => s.review?.id === requestId ? {
+      ...s, fileName: null, review: { ...s.review, summary: "", keywords: [], target_role: "",
+        employment_types: [], experience_band: null, industry: null },
+    } : s));
+  }, []);
 
   return (
     <div className="app">
@@ -56,7 +63,8 @@ export function App() {
               hidden={s.key !== activeKey}
             >
               {s.review ? (
-                <ReviewScreen review={s.review} fileName={s.fileName} onRestart={startSession} />
+                <ReviewScreen review={s.review} fileName={s.fileName} onRestart={startSession}
+                  onFinished={forgetReview} />
               ) : (
                 <UploadForm onRead={(review, fileName) => cvRead(s.key, review, fileName)} />
               )}

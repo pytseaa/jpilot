@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class SearchRequest:
-    """One candidate's request. Held in memory only: the CV text never reaches a file."""
+    """One in-memory request. CV and review fields are cleared before its terminal status."""
     id: str
     cv_text: str
     summary: str
@@ -17,3 +17,13 @@ class SearchRequest:
     stage: str | None = None
     jobs: list[dict] = field(default_factory=list)  # the shortlist with its verified claims, once done
     dropped_claims: int = 0
+    skipped_jobs: int = 0
+    explanation: str | None = None
+    error: str | None = None
+    trace: object = None
+
+    def forget_cv(self):
+        self.cv_text = ""
+        self.summary = ""
+        self.keywords = []
+        self.target_role = ""

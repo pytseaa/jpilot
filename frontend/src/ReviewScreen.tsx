@@ -3,7 +3,7 @@ import { getResults, getStage, type Results, type Review, type Reviewed, startSe
 import { JobList } from "./JobList";
 import { BandAndIndustry, EmploymentPills, NO_EMPLOYMENT_TYPE } from "./PreferenceFields";
 
-type Props = { review: Review; fileName: string | null; onRestart: () => void };
+type Props = { review: Review; fileName: string | null; onRestart: () => void; onFinished: (id: string) => void };
 
 const POLL_MS = 2000;
 // What the progress line says for each stage that is still running.
@@ -15,7 +15,7 @@ const RUNNING_TEXT: Partial<Record<NonNullable<Stage>, string>> = {
 };
 
 // Not a <form>: pressing Enter in a field must never act as the Search button.
-export function ReviewScreen({ review, fileName, onRestart }: Props) {
+export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props) {
   const { id, ...initial } = review;
   const [values, setValues] = useState<Reviewed>(initial);
   const [newKeyword, setNewKeyword] = useState("");
@@ -24,25 +24,38 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
   const [stage, setStage] = useState<Stage>(null);
   const [results, setResults] = useState<Results | null>(null);
   const searching = stage !== null && stage in RUNNING_TEXT;
+  const finished = stage === "done" || stage === "failed";
 
   const update = (patch: Partial<Reviewed>) => setValues({ ...values, ...patch });
 
-  // shortcut: polling never stops by itself (a hidden session, or a backend that lost the request, keeps asking), add a stop if the backend is ever not local.
   useEffect(() => {
     if (!searching) return;
+    let cancelled = false;
+    let polling = false;
     const timer = setInterval(async () => {
+      if (polling) return;
+      polling = true;
       try {
-        const { stage: next } = await getStage(id);
-        if (next === "done") setResults(await getResults(id));
-        setError("");
+        const { stage: next, error: failure } = await getStage(id);
+        const nextResults = next === "done" ? await getResults(id) : null;
+        if (cancelled) return;
+        if (next === "done" || next === "failed") {
+          setValues({ summary: "", keywords: [], target_role: "", employment_types: [], experience_band: null, industry: null });
+          setNewKeyword("");
+          onFinished(id);
+        }
+        if (nextResults) setResults(nextResults);
+        setError(next === "failed" ? failure || "The search failed. Please upload your CV again to retry." : "");
         setStage(next);
       } catch (err) {
         // The backend may still be searching, so keep the stage and poll again instead of giving up.
-        setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        polling = false;
       }
     }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [searching, id]);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [searching, id, onFinished]);
 
   const addKeyword = () => {
     const keyword = newKeyword.trim();
@@ -71,7 +84,8 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
 
   return (
     <section>
-      <h1>Check what we understood</h1>
+      <h1>{finished ? (stage === "done" ? "Your results" : "Search ended") : "Check what we understood"}</h1>
+      {!finished && <>
       <div className="review-meta">
         {fileName && <span className="file-chip">{fileName}</span>}
         <span className="note">Region: Hong Kong</span>
@@ -130,11 +144,10 @@ export function ReviewScreen({ review, fileName, onRestart }: Props) {
           </button>
         </div>
       </div>
+      </>}
       {error && <p role="alert" className="error">{error}</p>}
       {stage && searching && <p role="status" className="note">{RUNNING_TEXT[stage]}</p>}
-      {stage === "failed" && (
-        <p role="alert" className="error">The search failed. Please press Search to try again.</p>
-      )}
+      {finished && <p className="note">Your CV and summary have been deleted. Upload your CV again for a new search.</p>}
       {results && <JobList results={results} />}
       <div className="actions">
         <button type="button" className="secondary" onClick={onRestart}>

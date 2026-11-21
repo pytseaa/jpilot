@@ -202,17 +202,18 @@ def test_a_search_that_fails_ends_as_failed_and_gives_no_list(client, upload, mo
     monkeypatch.setattr(retrieval, "find_qualifying", broken)
     base, _ = start(client, upload, employment_types=["full-time"])
 
-    assert wait_until_finished(client, base) == {"stage": "failed"}
+    assert wait_until_finished(client, base)["stage"] == "failed"
     assert client.get(f"{base}/results").status_code == 409
 
 
-def test_after_a_failed_search_the_candidate_can_search_again(client, upload, monkeypatch):
+def test_after_a_failed_search_the_candidate_must_upload_again(client, upload, monkeypatch):
     with monkeypatch.context() as broken:
         broken.setattr(retrieval, "find_qualifying", lambda *args: 1 / 0)
         base, body = start(client, upload, keywords=["SQL"], employment_types=["full-time"])
-        assert wait_until_finished(client, base) == {"stage": "failed"}
+        assert wait_until_finished(client, base)["stage"] == "failed"
 
-    assert client.post(f"{base}/search", json=body).status_code == 200
+    assert client.post(f"{base}/search", json=body).status_code == 410
+    base, _ = start(client, upload, keywords=["SQL"], employment_types=["full-time"])
     assert wait_until_finished(client, base) == {"stage": "done"}
     assert ids(client.get(f"{base}/results").json()["jobs"]) == {"k-title", "k-desc"}
 

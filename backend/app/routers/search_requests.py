@@ -4,15 +4,16 @@ from threading import Lock, Thread
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request, Response, UploadFile
 
 from app import db
 from app.models.search_request import SearchRequest
-from app.runners.tacc import SubmissionFailed
+from app.runners.tacc import SERVICE_MESSAGE, SubmissionFailed
+from app.trace import RequestTrace
 from app.schemas.search import Results, Status
 from app.schemas.search_request import (
     BlankIsNone, EmploymentType, ExperienceBand, Industry, Review, Reviewed)
-from app.services import checking, cv_intake, refinement
+from app.services import checking, cv_intake, explanations, refinement, retrieval
 
 router = APIRouter(prefix="/api/search-requests")
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ def _review(stored):
 @router.post("")
 def create(
     request: Request,
+    response: Response,
     cv: UploadFile,
     employment_types: Annotated[list[EmploymentType], Form(min_length=1)],
     experience_band: Annotated[ExperienceBand | None, BlankIsNone, Form()] = None,
@@ -33,20 +35,34 @@ def create(
     target_role: Annotated[str, Form()] = "",
 ) -> Review:
     """Read the CV and return its summary for the review screen."""
+    request_id = uuid4().hex
+    trace = RequestTrace(request.app.state.data_dir, request_id)
+    headers = {"X-Request-ID": request_id}
+    response.headers.update(headers)
     target_role = target_role.strip()
     try:
         cv_text = cv_intake.extract_text(cv.file.read())
+        answer = cv_intake.summarise(cv_text, trace.runner(request.app.state.runner), not target_role)
     except cv_intake.CvRejected as exc:
-        raise HTTPException(422, str(exc)) from exc
-    try:
-        answer = cv_intake.summarise(cv_text, request.app.state.runner, not target_role)
-    except cv_intake.SummaryFailed as exc:
-        raise HTTPException(502, "The CV summary could not be made. Please try again.") from exc
+        trace.finish("failed", "invalid_answer")
+        raise HTTPException(422, str(exc), headers=headers) from None
+    except cv_intake.SummaryFailed:
+        trace.finish("failed", "invalid_answer")
+        raise HTTPException(502, "The CV could not be matched because no usable CV summary was returned. "
+                            "Please upload your CV again to retry.", headers=headers) from None
     except SubmissionFailed as exc:
-        raise HTTPException(502, str(exc)) from exc
-    stored = SearchRequest(uuid4().hex, cv_text, answer.summary, answer.keywords,
+        trace.finish("failed", "submission_failed")
+        raise HTTPException(502, str(exc), headers=headers) from None
+    except Exception:
+        trace.finish("failed", "client_error")
+        raise HTTPException(502, "The CV could not be read. Please upload your CV again.", headers=headers) from None
+    finally:
+        cv.file.close()
+    stored = SearchRequest(request_id, cv_text, answer.summary, answer.keywords,
                            target_role or answer.target_role.strip(),
                            employment_types, experience_band, industry)
+    stored.trace = trace
+    trace.review()
     request.app.state.requests[stored.id] = stored
     return _review(stored)
 
@@ -59,19 +75,36 @@ def _stored(request, request_id):
 
 
 def _run_search(data_dir, runner, stored):
-    # shortcut: only a raised error ends a search, so a hung TACC submission blocks every session until restart (TaccRunner polls with no timeout of its own), add one in the runner once a real run hangs.
     try:
+        runner = stored.trace.runner(runner)
         with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
+            passing = retrieval.count_passing(conn, stored.employment_types)
+            def on_round(round_number):
+                stored.trace.stage(f"refining round {round_number}")
+                stored.stage = f"refining round {round_number}"
             qualifying = refinement.widen(
                 conn, stored.keywords, stored.summary, stored.target_role, stored.employment_types, runner,
-                lambda round_number: setattr(stored, "stage", f"refining round {round_number}"))
+                on_round)
+        stored.trace.stage("checking jobs")
         stored.stage = "checking jobs"
-        stored.jobs, stored.dropped_claims = checking.check_jobs(
-            qualifying, stored.cv_text, stored.summary, runner, stored.experience_band, stored.industry)
+        stored.jobs, stored.dropped_claims, stored.skipped_jobs = checking.check_jobs(
+            qualifying, stored.cv_text, stored.summary, runner, stored.experience_band, stored.industry, stored.trace)
+        stored.explanation = explanations.short_results(stored.jobs, passing, len(qualifying), stored.skipped_jobs)
+        stored.forget_cv()
+        stored.trace.finish("done")
         stored.stage = "done"
-    except Exception:  # whatever went wrong, the candidate must see "failed", not a search that never ends
-        logger.exception("The search for request %s failed", stored.id)
-        stored.stage = "failed"
+    except Exception as exc:  # never log exception text: a library error may include prompt or answer text
+        failure = "submission_failed" if isinstance(exc, SubmissionFailed) else "client_error"
+        stored.jobs = []
+        stored.forget_cv()
+        stored.error = ((SERVICE_MESSAGE if str(exc) == SERVICE_MESSAGE else "The TACC submission failed. No partial results are shown.")
+                        if isinstance(exc, SubmissionFailed) else "The search failed. No partial results are shown.")
+        stored.error += " Your CV has been deleted. Please upload it again to retry."
+        logger.error("Request %s failed (%s)", stored.id, failure)
+        try:
+            stored.trace.finish("failed", failure)
+        finally:
+            stored.stage = "failed"
 
 
 @router.post("/{request_id}/search")
@@ -79,19 +112,24 @@ def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
     """Keep the reviewed values and start the search in the background."""
     stored = _stored(request, request_id)
     with _start_lock:  # two starts at the same moment must not both pass the check
+        if stored.stage in ("done", "failed"):
+            raise HTTPException(410, "Your CV has been deleted. Please upload it again to start a new search.")
         # One search at a time for the whole backend; list() copies, as an upload may add a request.
         if any(other.stage not in (None, "done", "failed") for other in list(request.app.state.requests.values())):
             raise HTTPException(409, "A search is already running.")
         stored.stage = "searching"
-    vars(stored).update(reviewed.model_dump())
-    Thread(target=_run_search, args=(request.app.state.data_dir, request.app.state.runner, stored),
-           daemon=True).start()
-    return _review(stored)
+        vars(stored).update(reviewed.model_dump())
+        review = _review(stored)  # snapshot before the worker can delete the CV summary
+        stored.trace.stage("searching")
+        Thread(target=_run_search, args=(request.app.state.data_dir, request.app.state.runner, stored),
+               daemon=True).start()
+    return review
 
 
-@router.get("/{request_id}/status")
+@router.get("/{request_id}/status", response_model_exclude_none=True)
 def status(request: Request, request_id: str) -> Status:
-    return Status(stage=_stored(request, request_id).stage)
+    stored = _stored(request, request_id)
+    return Status(stage=stored.stage, error=stored.error)
 
 
 @router.get("/{request_id}/results")
@@ -99,4 +137,5 @@ def results(request: Request, request_id: str) -> Results:
     stored = _stored(request, request_id)
     if stored.stage != "done":  # a search that is running or failed has no list to show
         raise HTTPException(409, "The search is not finished.")
-    return Results.model_validate({"jobs": stored.jobs, "dropped_claims": stored.dropped_claims})
+    return Results.model_validate({"jobs": stored.jobs, "dropped_claims": stored.dropped_claims,
+                                   "skipped_jobs": stored.skipped_jobs, "explanation": stored.explanation})

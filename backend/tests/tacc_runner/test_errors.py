@@ -45,3 +45,26 @@ def test_some_calls_failing_is_not_a_service_failure(tcloud, runner):
 
     assert runner(prompts) == {"a": {"status": "ok", "answer": {}},
                                "b": {"status": "failed", "error_type": "unreachable"}}
+
+
+@pytest.mark.parametrize("records", [{}, [], {"cv-summary": "not a record"}])
+def test_incomplete_answer_files_fail_the_submission_and_remove_local_prompts(tcloud, runner, client_dir, records):
+    tcloud.will_answer(records)
+    with pytest.raises(SubmissionFailed):
+        runner(PROMPTS)
+    assert not (client_dir / "prompts.json").exists()
+
+
+def test_failed_submit_removes_cv_bearing_local_prompts(tcloud, runner, client_dir):
+    tcloud.will_print_on_submit("submission failed", exit_code=1)
+    with pytest.raises(SubmissionFailed):
+        runner([{"id": "cv-summary", "prompt": "PRIVATE-CV-MARKER"}])
+    assert all(b"PRIVATE-CV-MARKER" not in p.read_bytes() for p in client_dir.rglob("*") if p.is_file())
+
+
+def test_polling_timeout_fails_and_removes_local_prompts(tcloud, runner, client_dir):
+    tcloud.keep_running_for(100)
+    runner.submission_timeout = 0
+    with pytest.raises(SubmissionFailed, match="timed out"):
+        runner(PROMPTS)
+    assert not (client_dir / "prompts.json").exists()

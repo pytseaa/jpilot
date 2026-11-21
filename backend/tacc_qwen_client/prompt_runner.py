@@ -11,6 +11,7 @@ Answer file, under TACC_USERDIR/jpilot-tacc-client/job-<SLURM_JOB_ID>.json:
                              "answer": <the parsed reply>,     # when ok
                              "error_type": "...",              # when failed
                              "attempts": 1 or 2,
+                             "errors": [<error types from failed attempts>],
                              "prompt_tokens": n, "completion_tokens": n,
                              "elapsed_seconds": s}}}           # totals over all attempts
 error_type is one of http_error, timeout, unreachable, bad_response, invalid_json,
@@ -106,17 +107,21 @@ def _ask(item, base_url, timeout):
     started = time.perf_counter()
     tokens = {"prompt_tokens": 0, "completion_tokens": 0}
     attempts = 0
+    errors = []
     try:
         for attempts in range(1, MAX_ATTEMPTS + 1):
             outcome, usage = _attempt(item, base_url,
                                       0 if attempts == 1 else RETRY_TEMPERATURE, timeout)
             for name in tokens:
                 tokens[name] += _count(usage, name)
+            if outcome["status"] == "failed":
+                errors.append(outcome["error_type"])
             if outcome["status"] == "ok" or outcome["error_type"] not in RETRIED_ERRORS:
                 break
     except Exception:  # a bug or an odd reply must cost only this call, never the others
         outcome = _failed("client_error")
-    return {**outcome, "attempts": attempts, **tokens,
+        errors.append("client_error")
+    return {**outcome, "attempts": attempts, "errors": errors, **tokens,
             "elapsed_seconds": round(time.perf_counter() - started, 3)}
 
 

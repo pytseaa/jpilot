@@ -254,5 +254,5 @@ def test_a_refinement_submission_that_raises_ends_the_search_as_failed(client, u
 
     base = start(client, upload)
 
-    assert wait_until_finished(client, base) == {"stage": "failed"}
+    assert wait_until_finished(client, base)["stage"] == "failed"
     assert client.get(f"{base}/results").status_code == 409  # no partial list

@@ -50,6 +50,7 @@ export function UploadForm({ onRead }: { onRead: (review: Review, fileName: stri
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      removeFile();
       setBusy(false);
     }
   };

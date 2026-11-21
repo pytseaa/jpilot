@@ -28,7 +28,7 @@ export function Sidebar({ open, sessions, activeKey, onSelect, onNew }: Props) {
                     aria-current={session.key === activeKey}
                     onClick={() => onSelect(session.key)}
                   >
-                    {session.review.target_role}
+                    {session.review.target_role || "Completed search"}
                   </button>
                 </li>
               ),
