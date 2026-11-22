@@ -29,12 +29,15 @@ class SubmissionFailed(Exception):
 
 class TaccRunner:
     def __init__(self, tcloud=("tcloud",), client_dir=CLIENT_DIR, poll_seconds=5,
-                 submission_timeout=3600, command_timeout=120):
+                 submission_timeout=3600, command_timeout=120, progress=None):
         self.tcloud = list(tcloud)
         self.client_dir = client_dir
         self.poll_seconds = poll_seconds
         self.submission_timeout = submission_timeout
         self.command_timeout = command_timeout
+        # A callable(checked, total) the backend sets per search, or None when no one is listening.
+        self.progress = progress
+        self._max_checked = 0  # the count never goes down between two polls
         self._lock = Lock()
 
     def __call__(self, prompts):
@@ -43,6 +46,7 @@ class TaccRunner:
             return self._submit(prompts)
 
     def _submit(self, prompts):
+        self._max_checked = 0
         deadline = time.monotonic() + self.submission_timeout
         prompt_file = self.client_dir / "prompts.json"  # holds CV text, so it goes as soon as the call ends
         try:
@@ -52,11 +56,14 @@ class TaccRunner:
             if code != 0 or found is None:
                 raise SubmissionFailed("The TACC submission failed. Please check the TACC submission status and try again.")
             job = found.group(1)
+            total = len(prompts)
             # tcloud reports an error for a job that has finished, so an error means "done".
             while self._run("ps", "-j", job)[0] == 0:
                 if time.monotonic() >= deadline:
                     raise SubmissionFailed("The TACC submission timed out.", error_type="timeout")
+                self._poll_progress(job, total)
                 time.sleep(self.poll_seconds)
+            self._poll_progress(job, total)  # one last read, in case the log caught the final calls
             with tempfile.TemporaryDirectory() as tmp:
                 answers = Path(tmp) / "answers.json"
                 code, _ = self._run("download", f"jpilot-tacc-client/job-{job}.json", str(answers))
@@ -91,3 +98,40 @@ class TaccRunner:
             raise SubmissionFailed("The tcloud command could not be started. Check that tcloud is installed and configured.",
                                    error_type="command_unavailable") from None
         return done.returncode, (done.stdout + done.stderr).replace(b"\0", b"").decode(errors="replace")
+
+    def _poll_progress(self, job, total):
+        """Read the running log and report the count of finished calls, if anyone is listening.
+
+        The log is one 'CALL_DONE <n> of <total>: <id> <outcome>' line per finished call.
+        A log that is partly written, empty or unreadable never crashes this poll."""
+        if self.progress is None:
+            return
+        try:
+            code, log = self._run("cat", f"slurm_log/jpilot-tacc-client-{job}.log")
+            if code != 0:
+                return
+            checked = _count_done(log)
+            if checked is not None and checked > self._max_checked:
+                self._max_checked = checked
+                self.progress(checked, total)
+        except Exception:
+            return  # a bad poll must never crash the submission
+
+
+# One 'CALL_DONE <n> of <total>: ...' line per finished call. The lines may arrive out of
+# order (calls run in parallel), so the count is the highest <n> seen in the log so far.
+CALL_DONE = re.compile(r"CALL_DONE (\d+) of (\d+):")
+
+
+def _count_done(log):
+    """The highest finished-call count in the log, or None when no CALL_DONE line is there yet."""
+    best = 0
+    found = False
+    for line in log.splitlines():
+        match = CALL_DONE.search(line)
+        if match:
+            found = True
+            done = int(match.group(1))
+            if done > best:
+                best = done
+    return best if found else None

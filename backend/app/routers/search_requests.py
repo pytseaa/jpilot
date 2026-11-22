@@ -108,8 +108,12 @@ def _stored(request, request_id):
 
 
 def _run_search(data_dir, runner, stored):
+    raw = runner  # the app-level runner, before trace wrapping
+    if hasattr(raw, "progress"):
+        # TaccRunner reads the running log and calls this with (checked, total); FakeRunner has no progress.
+        raw.progress = lambda checked, total: vars(stored).update(checked=f"{checked} of {total}")
     try:
-        runner = stored.trace.runner(runner)
+        runner = stored.trace.runner(raw)
         with closing(db.connect(data_dir)) as conn:  # a connection belongs to the thread that opened it
             passing = retrieval.count_passing(conn, stored.employment_types)
             def on_round(round_number):
@@ -126,8 +130,12 @@ def _run_search(data_dir, runner, stored):
         stored.forget_cv()
         stored.trace.finish("done")
         stored.stage = "done"
+        stored.checked = None  # done: no more progress to show
     except Exception as exc:  # never log exception text: a library error may include prompt or answer text
         _fail_search(stored, exc)
+    finally:
+        if hasattr(raw, "progress"):
+            raw.progress = None  # one search at a time, but clear it anyway
 
 
 @router.post("/{request_id}/search")
@@ -156,7 +164,13 @@ def search(request: Request, request_id: str, reviewed: Reviewed) -> Review:
 @router.get("/{request_id}/status", response_model_exclude_unset=True)
 def status(request: Request, request_id: str) -> Status:
     stored = _stored(request, request_id)
-    return Status(stage=stored.stage, error=stored.error) if stored.error else Status(stage=stored.stage)
+    if stored.error:
+        return Status(stage=stored.stage, error=stored.error)
+    # The count is only meaningful while jobs are being checked; leave it out otherwise.
+    checked = stored.checked if stored.stage == "checking jobs" else None
+    if checked is not None:
+        return Status(stage=stored.stage, checked=checked)
+    return Status(stage=stored.stage)
 
 
 @router.get("/{request_id}/results")

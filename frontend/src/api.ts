@@ -68,7 +68,7 @@ export function startSearch(id: string, reviewed: Reviewed): Promise<Review> {
   });
 }
 
-export function getStage(id: string): Promise<{ stage: Stage; error?: string }> {
+export function getStage(id: string): Promise<{ stage: Stage; error?: string; checked?: string }> {
   return call(`/api/search-requests/${id}/status`);
 }
 

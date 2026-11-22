@@ -22,6 +22,7 @@ export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props)
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<Stage>(null);
+  const [checked, setChecked] = useState<string | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [resultsAttempt, setResultsAttempt] = useState(0);
   const [loadingResults, setLoadingResults] = useState(false);
@@ -36,6 +37,7 @@ export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props)
     onFinished(id);
     setError(message);
     setStage(next);
+    setChecked(null);
   }, [id, onFinished]);
 
   useEffect(() => {
@@ -46,13 +48,14 @@ export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props)
       if (polling) return;
       polling = true;
       try {
-        const { stage: next, error: failure } = await getStage(id);
+        const { stage: next, error: failure, checked: count } = await getStage(id);
         if (cancelled) return;
         if (next === "done" || next === "failed") {
           finish(next, next === "failed" ? failure || "The search failed. Please upload your CV again to retry." : "");
         } else {
           setError(next === null ? "The search has not started. Please try again." : "");
           setStage(next);
+          setChecked(count ?? null);
         }
       } catch (err) {
         // The backend may still be searching, so keep the stage and poll again instead of giving up.
@@ -182,7 +185,12 @@ export function ReviewScreen({ review, fileName, onRestart, onFinished }: Props)
       </div>
       </>}
       {error && <p role="alert" className="error">{error}</p>}
-      {stage && searching && <p role="status" className="note">{RUNNING_TEXT[stage]}</p>}
+      {stage && searching && (
+        <p role="status" className="note">
+          {RUNNING_TEXT[stage]}
+          {stage === "checking jobs" && checked && ` ${checked} jobs checked.`}
+        </p>
+      )}
       {finished && <p className="note">Your CV and summary have been deleted. Upload your CV again for a new search.</p>}
       {loadingResults && stage === "done" && <p role="status" className="note">Loading results...</p>}
       {stage === "done" && !results && !loadingResults && <button type="button" onClick={() => setResultsAttempt((attempt) => attempt + 1)}>Load results again</button>}
