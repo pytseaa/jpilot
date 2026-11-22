@@ -13,6 +13,19 @@ class Status(BaseModel):
     checked: str | None = None
 
 
+class LearningLink(BaseModel):
+    """One curated learning link the team has checked by hand. The URL never comes from Qwen."""
+    id: str
+    title: str
+    url: str
+
+
+class SkillGap(BaseModel):
+    """A job requirement the CV does not meet, with any learning links that fit it."""
+    requirement: str
+    learning_links: list[LearningLink]
+
+
 class ResultJob(BaseModel):
     """One job as the results list shows it."""
     job_id: str
@@ -25,6 +38,7 @@ class ResultJob(BaseModel):
     unverified: bool
     grade: Literal[1, 2]
     claims: list[Claim]
+    skill_gaps: list[SkillGap] = []
 
 
 class Results(BaseModel):

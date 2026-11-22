@@ -25,8 +25,12 @@ Keywords so far:
 CHECK = """Judge how well the CV below fits the job ad below, and reply with one JSON object that has these keys:
 "grade": 0 if the CV is not a fit for the job, 1 if it is a plausible fit, 2 if it is a strong fit,
 "claims": a list of reasons the CV fits the job, each an object with the keys "requirement" (the job requirement it meets, a short phrase), "cv_quote" (words copied exactly from the CV) and "job_quote" (words copied exactly from the job ad). Use an empty list if the CV fits nothing in the job.
+"unmet_requirements": a list of the job requirements the CV does not meet, each an object with the keys "requirement" (the job requirement it misses, a short phrase) and "link_ids" (a list of ids from the learning links below that teach that requirement; an empty list if none fit). Use an empty list if the CV meets every requirement.
 
-Copy every quote exactly as written. Do not reword it.
+Copy every quote exactly as written. Do not reword it. Give only a learning link id, never a URL.
+
+Learning links:
+{learning_links}
 
 CV summary:
 {cv_summary}

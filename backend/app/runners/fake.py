@@ -49,4 +49,5 @@ def _grade_by_quoting(prompt):
     cv_text = prompt.split("\nCV:\n", 1)[1].split("\n\nJob ad:\n", 1)[0]
     ad = prompt.split("\n\nJob ad:\n", 1)[1]
     cv_quote, job_quote = " ".join(cv_text.split()[:3]), " ".join(ad.split()[:3])
-    return {"grade": 2, "claims": [{"requirement": job_quote, "cv_quote": cv_quote, "job_quote": job_quote}]}
+    return {"grade": 2, "claims": [{"requirement": job_quote, "cv_quote": cv_quote, "job_quote": job_quote}],
+            "unmet_requirements": []}
