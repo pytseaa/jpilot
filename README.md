@@ -355,14 +355,15 @@ jobs). For each claim they wrote `yes` if the CV quote and the ad quote together
 
 | System | Claims judged | Judged unsupported | Rate | 95% range |
 |---|---|---|---|---|
-| Full | 50 | 21 | **42.0%** | 27.7% to 56.8% |
-| B2 | 50 | 18 | 36.0% | 23.9% to 48.9% |
+| Full | 50 | 10 | **20.0%** | 10.4% to 30.2% |
+| B2 | 50 | 7 | 14.0% | 5.6% to 23.9% |
 
-**The proposal's target was at most 5% unsupported claims. It was not met.** Even the low end of the Full range is more than
-five times the target. The two systems cannot be told apart on this measure.
+**The proposal's target was at most 5% unsupported claims. It was not met.** The low end of the Full range is about twice the
+target, and even the low end of the B2 range is above it. The two systems cannot be told apart on this measure.
 
-- The auditor's notes on the 39 `no` answers mostly say the same thing: the quote is real but shows only part of the
-  requirement. Examples: "Excel" for an ad asking "Word and Excel"; "Linux" for "comfortable in the terminal and SSH".
+- The auditor's notes on the 17 `no` answers mostly say the same thing: the quote is real but shows less than the ad asks for.
+  Examples: the CV rates English "good" for an ad that wants "strong proficiency" or "fluent" (2 claims); "basics" for
+  "well-versed"; a diploma for "Bachelor in Design". Two claims cite a wish to change career as design experience.
   The code only checks that a quote exists, so it passes these claims.
 - Separately, the code dropped 38 claims from the Full system before display because a quote was not found (275 distinct claims shown).
 - **Hard filters:** 0 of 320 shown jobs broke a filter (region, employment type, open for 30 days). This is true by design,
@@ -404,7 +405,7 @@ filter. A search for contractor jobs only returned the same 5 jobs as full-time.
 - **The snapshot expires.** A job counts as open for 30 days from today, not from the snapshot date. After 2026-12-22 the saved
   snapshot has no open jobs and every search says "No current jobs pass your employment type and Hong Kong filters."
 - **Small and made-up.** 8 made-up CVs, 16 queries that are 8 pairs, 99 graded jobs, 100 judged claims and one auditor.
-  The auditor's strictness sets the 42%, and there is no second auditor to measure it.
+  The auditor's strictness sets the 20%, and there is no second auditor to measure it.
 - **Settings A and B were written after the CVs had been searched** (10 searches on 2026-11-22, then the settings on 2026-11-23).
   They came from the CV texts only and were not changed after the four systems ran. The plan was to fix them first.
 - **The grade scale is a choice.** nDCG@5 here uses the grade itself (0, 1, 2) as the gain. Using 2^grade - 1 instead
