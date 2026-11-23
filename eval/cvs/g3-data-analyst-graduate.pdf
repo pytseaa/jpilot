@@ -1,0 +1,62 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 1472 >>
+stream
+BT /F1 10 Tf 13 TL 50 800 Td
+(Ng Hiu Tung \(synthetic CV, fictional person\)) '
+(Hong Kong | hiutung.ng@example.com | +852 5555 0103) '
+() '
+(PROFILE) '
+(Statistics graduate seeking a data analyst or business analyst role. Strong with SQL and) '
+(dashboards, and able to explain findings to people who are not technical.) '
+() '
+(EDUCATION) '
+(BSc in Statistics, The Chinese University of Hong Kong, 2022 - 2026, First Class Honours) '
+(- Courses: regression, time series, machine learning, data mining, experimental design) '
+(- Thesis: forecasting weekly retail demand with seasonal models) '
+() '
+(EXPERIENCE) '
+(Data Analyst Intern, Harbour Retail Group, Hong Kong, Jun 2025 - Sep 2025) '
+(- Cleaned and joined sales data from 3 systems using SQL and Python \(pandas\)) '
+(- Built a Tableau dashboard on weekly store performance used by 8 store managers) '
+(- Found that 11% of promotions lost money and presented the result to the merchandising team) '
+() '
+(Research Assistant, Department of Statistics, CUHK, 2024 - 2025) '
+(- Ran survey analysis in R for a study of 1,200 respondents and wrote the methods section) '
+() '
+(SKILLS) '
+(- SQL, Python \(pandas, scikit-learn\), R, Excel, Tableau, Power BI) '
+(- A/B testing, regression, data cleaning, data visualisation, report writing) '
+(- English \(fluent\), Cantonese \(native\), Mandarin \(fluent\)) '
+() '
+(CERTIFICATES) '
+(- Google Data Analytics Professional Certificate) '
+(- Tableau Desktop Specialist) '
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000001709 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1835
+%%EOF

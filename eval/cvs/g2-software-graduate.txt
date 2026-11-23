@@ -1,0 +1,30 @@
+Lam Wai Yin (synthetic CV, fictional person)
+Hong Kong | waiyin.lam@example.com | +852 5555 0102
+
+PROFILE
+Computer science graduate looking for a junior software developer role. Built and deployed
+web applications in a team, and enjoys writing tests and clean, readable code.
+
+EDUCATION
+BEng in Computer Science, The Hong Kong University of Science and Technology, 2022 - 2026
+- Courses: data structures, algorithms, databases, operating systems, software engineering
+- Capstone: a course scheduling web app used by 120 students in a pilot
+
+EXPERIENCE
+Software Engineering Intern, PayLoop Technology Limited, Hong Kong, Jun 2025 - Aug 2025
+- Built REST APIs in Python with FastAPI and PostgreSQL for a payment reminder service
+- Wrote unit tests with pytest and raised test coverage from 52% to 78%
+- Fixed 14 bugs from the issue tracker and shipped features in two-week sprints
+
+Teaching Assistant, Department of Computer Science, HKUST, 2024 - 2025
+- Ran weekly lab sessions on Java and SQL for 40 first-year students
+- Marked assignments and held office hours
+
+PROJECTS
+- Campus marketplace: React and TypeScript front end, Node.js back end, Docker deployment
+- Open source: merged 3 pull requests to a small Python command line library
+
+SKILLS
+- Python, Java, JavaScript, TypeScript, SQL, HTML and CSS
+- React, FastAPI, Git, Docker, Linux, REST APIs, agile and Scrum
+- English (fluent), Cantonese (native), Mandarin (fluent)

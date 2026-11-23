@@ -1,0 +1,58 @@
+{
+  "status": "approved",
+  "status_note": "Approved on 2026-11-23 as written. systems.py refuses to run on anything else. Each CV's author is listed below: nobody may rate a CV they wrote.",
+  "provenance": "Drafted on 2026-11-23 from the CV texts alone. The 8 CVs had already been through 10 end-to-end searches on 2026-11-22 (no experience band or industry set), so their job lists were seen before these settings were written; they were not used to choose them. The plan asks for settings fixed before any results are seen, so the report must say this.",
+  "employment_types": ["full-time"],
+  "employment_types_note": "Hard filter, the same in settings A and B and for every CV. 'full-time' matches the 10 end-to-end runs. 249 of the 276 snapshot jobs pass it (184 list no type and pass every filter).",
+  "rule": "A is the candidate's own experience band and industry. B is a neighbouring band (up for the experienced CVs and graduates, down for the two career switchers) and a related industry. Bands: 0-2, 3-5, 6-9, 10+.",
+  "cvs": {
+    "e1-marketing-experienced": {
+      "author": null,
+      "A": {"experience_band": "6-9", "industry": "Retail and e-commerce"},
+      "B": {"experience_band": "10+", "industry": "Media, advertising and marketing"},
+      "why": "CV states 8 years. Current employer is a beauty brand selling through stores and online. B is the next band up and the agency industry of the first job."
+    },
+    "e2-customer-admin-experienced": {
+      "author": null,
+      "A": {"experience_band": "6-9", "industry": "Healthcare and pharmaceuticals"},
+      "B": {"experience_band": "3-5", "industry": "Information technology and telecoms"},
+      "why": "CV states 7 years. Current employer is a medical supplies company. B is the next band down and the telecom company of the previous job."
+    },
+    "e3-logistics-experienced": {
+      "author": null,
+      "A": {"experience_band": "6-9", "industry": "Logistics and transport"},
+      "B": {"experience_band": "10+", "industry": "Manufacturing and engineering"},
+      "why": "CV states 9 years in freight forwarding and warehousing. B is the next band up and a neighbouring supply-chain industry."
+    },
+    "g1-finance-graduate": {
+      "author": null,
+      "A": {"experience_band": "0-2", "industry": "Professional services (accounting, legal, consulting)"},
+      "B": {"experience_band": "3-5", "industry": "Banking and finance"},
+      "why": "Graduate with an audit internship at a CPA firm. B is the next band up and the closest finance industry."
+    },
+    "g2-software-graduate": {
+      "author": null,
+      "A": {"experience_band": "0-2", "industry": "Information technology and telecoms"},
+      "B": {"experience_band": "3-5", "industry": "Banking and finance"},
+      "why": "Graduate with a software internship. B is the next band up and the payments industry of that internship."
+    },
+    "g3-data-analyst-graduate": {
+      "author": null,
+      "A": {"experience_band": "0-2", "industry": "Retail and e-commerce"},
+      "B": {"experience_band": "3-5", "industry": "Information technology and telecoms"},
+      "why": "Graduate with a data internship at a retail group. B is the next band up and a related data-heavy industry."
+    },
+    "s1-teacher-to-hr-switcher": {
+      "author": null,
+      "A": {"experience_band": "3-5", "industry": "Education and training"},
+      "B": {"experience_band": "0-2", "industry": "Non-profit and social services"},
+      "why": "Career switcher; the CV's own profile says 5 years of managing people as a teacher. B is the next band down, matching how little HR experience there is, and the youth charity where the volunteer HR work was done."
+    },
+    "s2-marketing-to-design-switcher": {
+      "author": null,
+      "A": {"experience_band": "3-5", "industry": "Hospitality, food and tourism"},
+      "B": {"experience_band": "0-2", "industry": "Media, advertising and marketing"},
+      "why": "Career switcher; the CV's own profile says 3 years working with design teams, in a coffee company. B is the next band down, since design experience is new, and the marketing industry."
+    }
+  }
+}

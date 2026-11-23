@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 FIRST_JOB = 4242
@@ -34,6 +35,9 @@ class FakeTcloud:
 
     def keep_running_for(self, polls):
         (self.home / "running_polls").write_text(str(polls), encoding="utf-8")
+
+    def will_stall_status_calls(self, count):
+        (self.home / "ps-stalls").write_text(str(count), encoding="utf-8")
 
     def will_print_on_submit(self, text, exit_code=0):
         """Make `submit` print this text and exit with this code, instead of submitting."""
@@ -101,6 +105,10 @@ def submit(home):
 
 
 def ps(home, job):
+    stalls = home / "ps-stalls"  # how many `ps -j` calls still hang, as one did on real TACC
+    if stalls.exists() and int(stalls.read_text(encoding="utf-8")) > 0:
+        stalls.write_text(str(int(stalls.read_text(encoding="utf-8")) - 1), encoding="utf-8")
+        time.sleep(5)
     counter = home / f"ps-{job}"
     count = int(counter.read_text(encoding="utf-8")) + 1 if counter.exists() else 1
     counter.write_text(str(count), encoding="utf-8")
@@ -109,8 +117,9 @@ def ps(home, job):
             sys.stdout)
         return 0
     finish(home, job)
-    say(f"Error: job {job} not found", sys.stderr)
-    return 1
+    # tcloud 0.4.1 prints this and still exits 0 for a finished job (checked on TACC, 2026-11-22).
+    say("slurm_load_jobs error: Invalid job id specified", sys.stderr)
+    return 0
 
 
 def download(home, remote, local):

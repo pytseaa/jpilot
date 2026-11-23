@@ -57,8 +57,7 @@ class TaccRunner:
                 raise SubmissionFailed("The TACC submission failed. Please check the TACC submission status and try again.")
             job = found.group(1)
             total = len(prompts)
-            # tcloud reports an error for a job that has finished, so an error means "done".
-            while self._run("ps", "-j", job)[0] == 0:
+            while self._listed(job):
                 if time.monotonic() >= deadline:
                     raise SubmissionFailed("The TACC submission timed out.", error_type="timeout")
                 self._poll_progress(job, total)
@@ -87,16 +86,33 @@ class TaccRunner:
         finally:
             prompt_file.unlink(missing_ok=True)
 
+    def _listed(self, job):
+        """True while `tcloud ps -j` lists the job. For a finished job tcloud 0.4.1 prints an error
+        and still exits 0 (checked on TACC, 2026-11-22), so the job's row is what counts."""
+        try:
+            code, output = self._run("ps", "-j", job)
+        except SubmissionFailed as exc:
+            if exc.error_type != "timeout":
+                raise
+            return True  # a stalled status call (seen on real TACC) says nothing about the job; the deadline still ends the wait
+        return code == 0 and re.search(rf"^\s*{job}\s", output, re.MULTILINE) is not None
+
     def _run(self, *args, cwd=None):
         """Run tcloud. Return its exit code and its output with the NUL bytes it writes removed."""
-        try:
-            done = subprocess.run([*self.tcloud, *args], cwd=cwd, capture_output=True,
-                                  timeout=self.command_timeout)
-        except subprocess.TimeoutExpired:
-            raise SubmissionFailed("The TACC command timed out.", error_type="timeout") from None
-        except OSError:
-            raise SubmissionFailed("The tcloud command could not be started. Check that tcloud is installed and configured.",
-                                   error_type="command_unavailable") from None
+        # A real tcloud call sometimes stalls past the timeout (seen on submit, ps and cat, 2026-11-22) and the
+        # next one works at once, so a timeout gets one more try.
+        # shortcut: a retried submit whose first try did get through starts a second job; the extra job is harmless, stop it with tcloud cancel.
+        for attempt in (1, 2):
+            try:
+                done = subprocess.run([*self.tcloud, *args], cwd=cwd, capture_output=True,
+                                      timeout=self.command_timeout)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt == 2:
+                    raise SubmissionFailed("The TACC command timed out.", error_type="timeout") from None
+            except OSError:
+                raise SubmissionFailed("The tcloud command could not be started. Check that tcloud is installed and configured.",
+                                       error_type="command_unavailable") from None
         return done.returncode, (done.stdout + done.stderr).replace(b"\0", b"").decode(errors="replace")
 
     def _poll_progress(self, job, total):

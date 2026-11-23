@@ -21,7 +21,10 @@ Thumbs.db
 .ignore/
 .scratch/
 docs/
-eval/
+
+eval/out/
+eval/tacc_probe/out/
 
 backend/tacc_qwen_client/prompts.json
 backend/data/
+qwen-public-client/
