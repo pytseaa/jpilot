@@ -25,3 +25,4 @@ eval/
 
 backend/tacc_qwen_client/prompts.json
 backend/data/
+qwen-public-client/

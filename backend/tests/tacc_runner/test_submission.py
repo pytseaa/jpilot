@@ -23,6 +23,25 @@ def test_the_runner_waits_until_the_status_command_errors_because_the_job_finish
     assert [call[:2] for call in tcloud.calls()].count(["ps", "-j"]) == 4  # 3 running, then the error
 
 
+def test_a_status_call_that_stalls_twice_is_asked_again_instead_of_failing_the_submission(tcloud, runner):
+    # On real TACC `ps -j` hung past the command timeout while the job kept running.
+    tcloud.will_answer({"cv-summary": OK})
+    tcloud.will_stall_status_calls(2)
+    runner.command_timeout = 1
+
+    assert runner(PROMPTS) == {"cv-summary": OK}
+
+
+def test_a_command_that_stalls_once_is_tried_again(tcloud, runner):
+    # The first `ps -j` hangs past the timeout and the job is still fine; the retry gets through.
+    tcloud.will_answer({"cv-summary": OK})
+    tcloud.will_stall_status_calls(1)
+    runner.command_timeout = 1
+
+    assert runner(PROMPTS) == {"cv-summary": OK}
+    assert [call[:2] for call in tcloud.calls()].count(["ps", "-j"]) == 2  # the stalled call, then its retry
+
+
 def test_the_prompt_file_is_uploaded_with_the_folder(tcloud, runner):
     tcloud.will_answer({"cv-summary": OK})
 
